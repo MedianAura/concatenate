@@ -1,0 +1,75 @@
+{
+  "name": "@medianaura/concatenate",
+  "version": "0.0.1",
+  "description": "Concatenate CLI",
+  "keywords": [
+    "oclif"
+  ],
+  "repository": "https://github.com/MedianAura/concatenate",
+  "license": "MIT",
+  "author": "MedianAura",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "concat": "./bin/run.js"
+  },
+  "files": [
+    "/bin",
+    "/dist",
+    "/oclif.manifest.json"
+  ],
+  "scripts": {
+    "build": "shx rm -rf dist && tsc -b",
+    "check:knip": "knip",
+    "check:lint": "eslint . --ext .js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts,.vue",
+    "check:prettier": "prettier --list-different --cache .",
+    "check:tsc": "tsc --noEmit",
+    "clear:backend": "rimraf .out/electron",
+    "fix:lint": "eslint . --ext .js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts,.vue --fix",
+    "fix:prettier": "prettier --write --list-different --cache .",
+    "prepack": "oclif manifest && oclif readme",
+    "run:frontend": "vite --mode development",
+    "start:backend": "wait-on ./.out/electron/entry.mjs && nodemon ./.out/electron/entry.mjs --watch .out/electron --delay 2.5",
+    "start:watch": "npm run clear:backend && rollup -c rollup.config.mjs --watch --environment development",
+    "typecheck": "npm run typecheck:node",
+    "typecheck:node": "tsc --noEmit --composite false",
+    "version": "oclif readme && git add README.md"
+  },
+  "oclif": {
+    "bin": "concat",
+    "commands": "./dist/commands",
+    "dirname": "concat",
+    "plugins": [
+      "@oclif/plugin-help",
+      "@oclif/plugin-plugins"
+    ],
+    "topicSeparator": " ",
+    "topics": {
+      "hello": {
+        "description": "Say hello to the world and others"
+      }
+    }
+  },
+  "dependencies": {
+    "@oclif/core": "^3.26.5",
+    "@oclif/plugin-help": "^6.0.21",
+    "@oclif/plugin-plugins": "^5.0.18"
+  },
+  "devDependencies": {
+    "@oclif/prettier-config": "^0.2.1",
+    "@oclif/test": "^3.2.12",
+    "@types/node": "^20.12.8",
+    "eslint": "^8.57.0",
+    "eslint-config-oclif": "^5.2.0",
+    "eslint-config-oclif-typescript": "^3.1.7",
+    "eslint-config-prettier": "^9.1.0",
+    "oclif": "^3.17.2",
+    "prettier": "^3.2.5",
+    "shx": "^0.3.4",
+    "typescript": "^5.4.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
