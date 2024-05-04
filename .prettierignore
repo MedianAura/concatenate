@@ -1,0 +1,6 @@
+out
+dist
+package-lock.json
+LICENSE.md
+tsconfig.json
+tsconfig.*.json
