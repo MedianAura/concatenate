@@ -1,8 +1,6 @@
 type: series
 actions:
-  - eslint:
-    label: Fixing with ESLint
+  - label: Fixing with ESLint
     command: eslint . --ext .js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts,.vue --fix
-  - prettier:
-    label: Fixing with Prettier
+  - label: Fixing with Prettier
     command: prettier --write --list-different --cache .

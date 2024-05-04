@@ -1,14 +1,10 @@
 type: parallel
 actions:
-  - eslint:
-    label: Checking with ESLint
+  - label: Checking with ESLint
     command: eslint . --ext .js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts,.vue
-  - prettier:
-    label: Checking with Prettier
+  - label: Checking with Prettier
     command: prettier --list-different --cache .
-  - knip:
-    label: Checking with Knip
+  - label: Checking with Knip
     command: knip
-  - tsc:
-    label: Checking with TSC
+  - label: Checking with TSC
     command: tsc --noEmit

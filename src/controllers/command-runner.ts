@@ -12,7 +12,7 @@ import { ConfigurationModel, type ConfigurationModelSchema } from '../models/con
 const parseJSON = json5.parse;
 
 export class CommandRunner {
-  public async run(config: string, _options: { automate: boolean }): Promise<void> {
+  public async run(config: string): Promise<void> {
     const data = await this.validateData(config);
 
     const tasks = new Listr<unknown>([], {
@@ -46,7 +46,6 @@ export class CommandRunner {
 
     const configFiles = await globby(`${config}.*`, { dot: true, cwd: _configPath, absolute: true });
     if (configFiles.length !== 1) {
-      console.error(_configPath);
       throw new Error(`There was an issue trying to find the configuration file for ${config}`);
     }
 
