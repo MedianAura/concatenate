@@ -6,6 +6,7 @@ import { ConfigurationDefault } from '../constants/configuration-default.js';
 import { Logger } from '../helpers/logger.js';
 import { getRootDirectoryPath } from '../helpers/root-directory-path.js';
 import { CommandSetupModel, type SetupFileExtensionType } from '../models/command-model.js';
+import { ensureDirSync } from 'fs-extra';
 
 const stringifyJSON = json5.stringify;
 
@@ -16,7 +17,9 @@ export class SetupRunner {
     Logger.title(`Creating configuration with format: ${extension}`);
     for (const configuration in ConfigurationDefault) {
       const writable = this.getString(ConfigurationDefault[configuration], currentExtension);
-      const configFile = path.resolve(getRootDirectoryPath(), `${configuration}.${currentExtension}`);
+      const configFile = path.resolve(getRootDirectoryPath(), '.concatenate', `${configuration}.${currentExtension}`);
+
+      ensureDirSync(path.dirname(configFile));
 
       Logger.info(`Writing file <${configFile}>`);
       fs.writeFileSync(configFile, writable, { encoding: 'utf8' });

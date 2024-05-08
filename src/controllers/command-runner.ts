@@ -6,7 +6,7 @@ import type { ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { parse as parseYaml } from 'yaml';
-import { getRootDirectoryPath } from '../helpers/root-directory-path.js';
+import { getConcatenateDirectoryPath } from '../helpers/root-directory-path.js';
 import { ConfigurationModel, type ConfigurationModelSchema } from '../models/configuration-model.js';
 
 const parseJSON = json5.parse;
@@ -26,7 +26,7 @@ export class CommandRunner {
         {
           title: action.label,
           task: async (): Promise<ChildProcess & ExecaChildPromise<string> & Promise<ExecaReturnValue<string>>> => {
-            return execaCommand(action.command, { cwd: path.resolve(getRootDirectoryPath(), '..') });
+            return execaCommand(action.command, { cwd: path.resolve(getConcatenateDirectoryPath(), '..') });
           },
         },
       ]);
@@ -42,7 +42,7 @@ export class CommandRunner {
   }
 
   private async getConfigFile(config: string = 'default'): Promise<string> {
-    const _configPath = path.resolve(`${getRootDirectoryPath()}/`);
+    const _configPath = path.resolve(`${getConcatenateDirectoryPath()}/`);
 
     const configFiles = await globby(`${config}.*`, { dot: true, cwd: _configPath, absolute: true });
     if (configFiles.length !== 1) {

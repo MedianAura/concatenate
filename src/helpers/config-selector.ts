@@ -1,12 +1,12 @@
 import enquirer from 'enquirer';
 import { globby } from 'globby';
 import path from 'node:path';
-import { getRootDirectoryPath } from './root-directory-path.js';
+import { getConcatenateDirectoryPath } from './root-directory-path.js';
 
 const { prompt } = enquirer;
 
 export async function getConfigFile(): Promise<string> {
-  const rootDirectory = getRootDirectoryPath();
+  const rootDirectory = getConcatenateDirectoryPath();
   let configFiles = await globby('*.*', { cwd: rootDirectory, dot: true });
 
   configFiles = configFiles.map((file) => path.parse(file).name);
