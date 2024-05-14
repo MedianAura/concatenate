@@ -5,7 +5,7 @@ export default defineConfig({
     {
       id: 'version',
       name: 'Create a new version',
-      prompts: [ ...getVersionPrompt() ],
+      prompts: [ getVersionPrompt ],
       actions: [
         {
           type: 'run',
@@ -22,6 +22,14 @@ export default defineConfig({
         {
           type: 'cmd',
           cmd: 'npm version --force --no-git-tag-version %(version)s'
+        },
+        {
+          type: 'cmd',
+          cmd: 'git add .',
+        },
+        {
+          type: 'cmd',
+          cmd: 'git commit -m "doc: mise à jour pour la version %(version)s"',
         },
         {
           type: 'cmd',
