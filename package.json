@@ -29,6 +29,7 @@
     "start": "node bin/run.js",
     "start:branch": "node bin/run.js branch",
     "start:setup": "node bin/run.js setup yaml",
+    "version": "automaton version",
     "watch": "shx rm -rf dist && tsc -b --watch"
   },
   "config": {
