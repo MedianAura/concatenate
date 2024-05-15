@@ -17,13 +17,9 @@
   ],
   "scripts": {
     "build": "shx rm -rf dist && tsc -b",
-    "check:knip": "knip",
-    "check:lint": "eslint . --ext .js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts,.vue",
-    "check:prettier": "prettier --list-different --cache .",
-    "check:tsc": "tsc --noEmit",
+    "check": "concatenate check",
     "create:version": "automaton version",
-    "fix:lint": "eslint . --ext .js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts,.vue --fix",
-    "fix:prettier": "prettier --write --list-different --cache .",
+    "fix": "concatenate fix",
     "start": "node bin/run.js",
     "start:branch": "node bin/run.js branch",
     "start:setup": "node bin/run.js setup yaml",
@@ -51,6 +47,7 @@
     "zod": "^3.23.6"
   },
   "devDependencies": {
+    "@medianaura/concatenate": "^0.1.1",
     "@rushstack/eslint-patch": "^1.10.2",
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^20.12.8",
@@ -60,6 +57,7 @@
     "cz-conventional-changelog": "^3.3.0",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^9.1.0",
+    "eslint-formatter-pretty": "^5.0.0",
     "eslint-plugin-eslint-comments": "^3.2.0",
     "eslint-plugin-import": "^2.29.1",
     "eslint-plugin-n": "^17.4.0",

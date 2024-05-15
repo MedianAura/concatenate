@@ -1,4 +1,4 @@
-import json5 from 'json5';
+import { ensureDirSync } from 'fs-extra';
 import fs from 'node:fs';
 import path from 'node:path';
 import { stringify as stringifyYaml } from 'yaml';
@@ -6,9 +6,6 @@ import { ConfigurationDefault } from '../constants/configuration-default.js';
 import { Logger } from '../helpers/logger.js';
 import { getRootDirectoryPath } from '../helpers/root-directory-path.js';
 import { CommandSetupModel, type SetupFileExtensionType } from '../models/command-model.js';
-import { ensureDirSync } from 'fs-extra';
-
-const stringifyJSON = json5.stringify;
 
 export class SetupRunner {
   public async run(extension: SetupFileExtensionType): Promise<void> {
@@ -34,7 +31,7 @@ export class SetupRunner {
     }
 
     if (extension === 'json') {
-      return stringifyJSON(data, undefined, 2);
+      return JSON.stringify(data, undefined, 2);
     }
 
     throw new Error('Unsupported file extension.');

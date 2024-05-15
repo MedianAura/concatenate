@@ -6,7 +6,7 @@ export const ConfigurationDefault: Record<string, ConfigurationModelSchema> = {
     actions: [
       {
         label: 'Checking with ESLint',
-        command: 'eslint . --ext .js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts,.vue',
+        command: 'eslint . --format pretty --ext .js,.jsx,.cjs,.mjs,.ts,.cts,.mts,.tsx,.cts,.mts,.vue',
       },
       {
         label: 'Checking with Prettier',
@@ -27,7 +27,7 @@ export const ConfigurationDefault: Record<string, ConfigurationModelSchema> = {
     actions: [
       {
         label: 'Fixing with ESLint',
-        command: 'eslint . --ext .js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts,.vue --fix',
+        command: 'eslint . --format pretty --ext .js,.jsx,.cjs,.mjs,.ts,.cts,.mts,.tsx,.cts,.mts,.vue --fix',
       },
       {
         label: 'Fixing with Prettier',
