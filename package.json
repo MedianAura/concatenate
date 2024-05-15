@@ -2,9 +2,6 @@
   "name": "@medianaura/concatenate",
   "version": "0.1.0",
   "description": "Concatenate CLI",
-  "keywords": [
-    "oclif"
-  ],
   "repository": "https://github.com/MedianAura/concatenate",
   "license": "MIT",
   "author": "MedianAura",
@@ -12,7 +9,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "concat": "./bin/run.js"
+    "concatenate": "./bin/run.js"
   },
   "files": [
     "./bin",
