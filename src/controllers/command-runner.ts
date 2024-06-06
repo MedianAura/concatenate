@@ -1,32 +1,76 @@
-import { type ExecaChildPromise, execaCommand, type ExecaReturnValue } from 'execa';
+import chalk from 'chalk';
+import { execaCommand, type ExecaReturnValue } from 'execa';
 import { globby } from 'globby';
 import json5 from 'json5';
 import { Listr } from 'listr2';
-import type { ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import type { Readable } from 'node:stream';
 import { parse as parseYaml } from 'yaml';
 import { getConcatenateDirectoryPath } from '../helpers/root-directory-path.js';
 import { ConfigurationModel, type ConfigurationModelSchema } from '../models/configuration-model.js';
 
 const parseJSON = json5.parse;
 
+interface ListrContextReport {
+  title: string;
+  exitCode: number;
+  stdout: string | Readable;
+  stderr: string | Readable;
+}
+
+interface ListrContext {
+  reports: ListrContextReport[];
+}
+
+function handleOutput(status: ExecaReturnValue<string>, action: string, context: ListrContext): void {
+  context.reports.push({
+    title: action,
+    exitCode: status.exitCode ?? 0,
+    stdout: status.stdout ?? '',
+    stderr: status.stderr ?? '',
+  });
+}
+
+function printContext(context: ListrContext): void {
+  for (const report of context.reports) {
+    if (report.exitCode === 0) continue;
+
+    console.log(`\n\n${chalk.bgYellow(report.title)}`);
+    console.log('---------------------------------');
+    console.log(report.stdout);
+  }
+}
+
 export class CommandRunner {
   public async run(config: string): Promise<void> {
     const data = await this.validateData(config);
+    const globalContext = { reports: [] as ListrContextReport[] };
 
-    const tasks = new Listr<unknown>([], {
+    const tasks = new Listr<ListrContext>([], {
       concurrent: data.type === 'parallel',
       collectErrors: 'full',
       exitOnError: data.type === 'series',
+      ctx: globalContext,
     });
 
     for (const action of data.actions) {
       tasks.add([
         {
           title: action.label,
-          task: async (): Promise<ChildProcess & ExecaChildPromise<string> & Promise<ExecaReturnValue<string>>> => {
-            return execaCommand(action.command, { cwd: path.resolve(getConcatenateDirectoryPath(), '..') });
+          task: async (context): Promise<void> => {
+            try {
+              const status = await execaCommand(action.command, {
+                cwd: path.resolve(getConcatenateDirectoryPath(), '..'),
+                stdio: 'pipe',
+                env: { ...process.env, FORCE_COLOR: '1' },
+              });
+
+              handleOutput(status, action.label, context);
+            } catch (error: unknown) {
+              handleOutput(error as ExecaReturnValue<string>, action.label, context);
+              throw new Error(action.label);
+            }
           },
         },
       ]);
@@ -38,6 +82,11 @@ export class CommandRunner {
       if (error instanceof Error) {
         throw new TypeError(`There was an issue trying to parse the configuration file: ${error.message}`);
       }
+    }
+
+    if (globalContext.reports.some((report) => report.exitCode !== 0)) {
+      printContext(globalContext);
+      throw new TypeError('Some tasks failed');
     }
   }
 

@@ -22,16 +22,19 @@ See the Setup command Example.
 # Commands
 
 ### Setup
+
 ```bash
 concatenate setup [json|yaml]
 ```
 
 ### Run
+
 ```bash
 concatenate [fix|check]
 ```
 
 ### Branch
+
 ```bash
 concatenate branch [branch name]
 ```
