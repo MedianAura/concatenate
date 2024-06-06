@@ -20,6 +20,7 @@
     "check": "concatenate check",
     "create:version": "automaton version",
     "fix": "concatenate fix",
+    "release": "automaton version",
     "start": "node bin/run.js",
     "start:branch": "node bin/run.js branch",
     "start:setup": "node bin/run.js setup yaml",
@@ -47,6 +48,7 @@
     "zod": "^3.23.6"
   },
   "devDependencies": {
+    "@medianaura/automaton": "^0.1.2",
     "@medianaura/concatenate": "^0.1.1",
     "@rushstack/eslint-patch": "^1.10.2",
     "@types/fs-extra": "^11.0.4",
