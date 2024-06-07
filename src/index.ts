@@ -15,21 +15,15 @@ program
   .version(packageJSON.version)
   .argument('[file]', 'command file to execute')
   .action(async (file: string) => {
-    try {
-      if (!file) {
-        Logger.warn('No file provded. Selecting a file...');
-        file = await getConfigFile();
+    if (!file) {
+      Logger.warn('No file provded. Selecting a file...');
+      file = await getConfigFile();
 
-        Logger.skipLine();
-      }
-
-      Logger.title(`Running file: ${file}`);
-      await new CommandRunner().run(file);
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        Logger.error(error.message);
-      }
+      Logger.skipLine();
     }
+
+    Logger.title(`Running file: ${file}`);
+    await new CommandRunner().run(file);
   });
 
 program
@@ -37,41 +31,30 @@ program
   .description('create default configuration files')
   .argument('<extension>', 'File type to create.')
   .action(async (extension: SetupFileExtensionType) => {
-    try {
-      await new SetupRunner().run(extension);
-    } catch (error: unknown) {
-      if (error instanceof ZodError) {
-        Logger.error("The extension provided doesn't match the expected format.");
-
-        for (const message of error.format()._errors) {
-          Logger.error(message);
-        }
-      } else if (error instanceof Error) {
-        Logger.error(error.message);
-      }
-
-      // eslint-disable-next-line unicorn/no-process-exit,n/no-process-exit
-      process.exit(1);
-    }
+    await new SetupRunner().run(extension);
   });
 
-program
-  .command('branch')
-  .description('create a git branch')
-  .argument('<branch>', 'name of the branch to create.')
-  .action((branch: string) => {
-    console.log(branch);
-  });
-
-export async function run(): Promise<void> {
+export async function run(): Promise<number> {
   Logger.clear();
   Logger.title('Welcome to Concatenate CLI');
 
   try {
-    program.parse();
+    await program.parseAsync();
   } catch (error: unknown) {
-    if (error instanceof Error) {
-      console.error(error.message);
+    Logger.skipLine();
+
+    if (error instanceof ZodError) {
+      Logger.error(`The extension provided doesn't match the expected format.`);
+
+      for (const message of error.format()._errors) {
+        Logger.error(message);
+      }
+      return 4;
+    } else if (error instanceof Error) {
+      Logger.error(error.message);
+      return 1;
     }
   }
+
+  return 0;
 }

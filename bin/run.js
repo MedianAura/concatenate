@@ -7,7 +7,9 @@ const packageJSON = await readPackageSync();
 
 updateNotifier({
   pkg: packageJSON,
-  updateCheckInterval: 1000 * 60 * 60 * 24 * 7, // 1 week
+  updateCheckInterval: 1000 * 60 * 60 * 24, // 1 day
 }).notify();
 
-await run();
+const status = await run();
+// eslint-disable-next-line n/no-process-exit
+process.exit(status);

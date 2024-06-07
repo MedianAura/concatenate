@@ -4,8 +4,15 @@ require('@rushstack/eslint-patch/modern-module-resolution');
 module.exports = {
   root: true,
   parser: '@typescript-eslint/parser',
-  extends: ['eslint:recommended', 'plugin:eslint-comments/recommended', 'plugin:n/recommended', 'plugin:unicorn/recommended', 'plugin:@typescript-eslint/recommended'],
-  plugins: ['@typescript-eslint', 'simple-import-sort', 'prettier', 'unused-imports', 'eslint-comments', 'import', 'promise', 'unicorn', 'n'],
+  extends: [
+    'eslint:recommended',
+    'plugin:eslint-comments/recommended',
+    'plugin:n/recommended',
+    'plugin:unicorn/recommended',
+    'plugin:regexp/recommended',
+    'plugin:@typescript-eslint/recommended',
+  ],
+  plugins: ['@typescript-eslint', 'simple-import-sort', 'prettier', 'unused-imports', 'eslint-comments', 'i', 'promise', 'unicorn', 'n', 'zod', 'regexp'],
   settings: {
     node: {
       resolvePaths: [__dirname],
@@ -13,6 +20,7 @@ module.exports = {
     },
   },
   rules: {
+    'n/no-missing-import': 'off',
     'simple-import-sort/imports': [
       'error',
       {
@@ -30,6 +38,8 @@ module.exports = {
         argsIgnorePattern: '^_',
       },
     ],
+    'zod/prefer-enum': 2,
+    'zod/require-strict': 2,
     'prettier/prettier': [
       'error',
       {},

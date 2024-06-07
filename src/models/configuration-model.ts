@@ -8,6 +8,7 @@ export const ConfigurationModel = z
     type: z.enum(ConfigurationType),
     actions: z.array(ActionModel),
   })
-  .required();
+  .required()
+  .strict();
 
 export type ConfigurationModelSchema = z.infer<typeof ConfigurationModel>;

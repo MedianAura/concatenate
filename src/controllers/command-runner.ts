@@ -17,6 +17,7 @@ interface ListrContextReport {
   exitCode: number;
   stdout: string | Readable;
   stderr: string | Readable;
+  message: string;
 }
 
 interface ListrContext {
@@ -24,11 +25,14 @@ interface ListrContext {
 }
 
 function handleOutput(status: ExecaReturnValue<string>, action: string, context: ListrContext): void {
+  const messages: string[] = [status.stderr.toString(), status.stdout.toString()];
+
   context.reports.push({
     title: action,
     exitCode: status.exitCode ?? 0,
     stdout: status.stdout ?? '',
     stderr: status.stderr ?? '',
+    message: messages.join('\n\n').trim(),
   });
 }
 
@@ -38,7 +42,7 @@ function printContext(context: ListrContext): void {
 
     console.log(`\n\n${chalk.bgYellow(report.title)}`);
     console.log('---------------------------------');
-    console.log(report.stdout);
+    console.log(report.message);
   }
 }
 
@@ -51,6 +55,9 @@ export class CommandRunner {
       concurrent: data.type === 'parallel',
       collectErrors: 'full',
       exitOnError: data.type === 'series',
+      rendererOptions: {
+        showErrorMessage: false,
+      },
       ctx: globalContext,
     });
 
@@ -78,10 +85,9 @@ export class CommandRunner {
 
     try {
       await tasks.run();
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        throw new TypeError(`There was an issue trying to parse the configuration file: ${error.message}`);
-      }
+    } catch {
+      printContext(globalContext);
+      throw new TypeError('Some tasks failed');
     }
 
     if (globalContext.reports.some((report) => report.exitCode !== 0)) {
