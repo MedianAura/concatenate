@@ -1,40 +1,463 @@
 # Concatenate
 
-Create .concatenate files to run multiple command line in series or parallel.
+A powerful CLI tool for executing multiple commands in series or parallel workflows. Perfect for automating your development tasks like linting, formatting, testing, and building.
 
 [![Version](https://img.shields.io/npm/v/@medianaura/concatenate.svg)](https://npmjs.org/package/@medianaura/concatenate)
 [![Downloads/week](https://img.shields.io/npm/dw/@medianaura/concatenate.svg)](https://npmjs.org/package/@medianaura/concatenate)
 [![Commitizen friendly](https://img.shields.io/badge/commitizen-friendly-brightgreen.svg)](http://commitizen.github.io/cz-cli/)
 
-- [Usage](#usage)
+## Table of Contents
 
-# Usage
+- [What is Concatenate?](#what-is-concatenate)
+- [Installation](#installation)
+- [How It Works](#how-it-works)
+- [Quick Start](#quick-start)
+- [Configuration](#configuration)
+- [Commands](#commands)
+- [Examples](#examples)
+- [Use Cases](#use-cases)
+- [Troubleshooting](#troubleshooting)
+- [Tips and Best Practices](#tips-and-best-practices)
 
-```bash
-npm i -D @medianaura/concatenate
-```
+## What is Concatenate?
 
-### Create Configuration File
+Concatenate is a task orchestration tool that allows you to define and run multiple command-line tasks either:
+- **In Series**: Commands run one after another (stops on first failure)
+- **In Parallel**: All commands run simultaneously (collects all results)
 
-Create JSON or Yaml Files in .concatenate Folder
-See the Setup command Example.
+Instead of writing complex bash scripts or npm scripts chains, you define your workflows in clean YAML or JSON configuration files.
 
-# Commands
+## Installation
 
-### Setup
-
-```bash
-concatenate setup [json|yaml]
-```
-
-### Run
-
-```bash
-concatenate [fix|check]
-```
-
-### Branch
+### As a Project Dependency (Recommended)
 
 ```bash
-concatenate branch [branch name]
+npm install --save-dev @medianaura/concatenate
 ```
+
+Then use via npm scripts or npx:
+
+```bash
+# Via npx
+npx concatenate fix
+
+# Via npm script (add to package.json)
+npm run fix
+```
+
+### Global Installation
+
+```bash
+npm install -g @medianaura/concatenate
+```
+
+Then use directly:
+
+```bash
+concatenate fix
+```
+
+**Requirements**: Node.js >= 18.0.0
+
+## How It Works
+
+1. **Configuration Files**: Create `.yaml` or `.json` files in a `.concatenate/` folder at your project root
+2. **Define Actions**: Each file defines a workflow with a `type` (series/parallel) and a list of `actions`
+3. **Execute**: Run `concatenate <filename>` to execute the workflow
+
+### Execution Modes
+
+**Series Mode** (`type: series`)
+- Tasks execute sequentially in the order defined
+- **Stops immediately** if any task fails (exit code ≠ 0)
+- Subsequent tasks are not executed after a failure
+- Best for dependent tasks (e.g., build → test → deploy)
+
+**Parallel Mode** (`type: parallel`)
+- All tasks start simultaneously
+- **All tasks run to completion** regardless of individual failures
+- Results are collected from all tasks
+- Errors are aggregated and displayed at the end
+- Best for independent tasks (e.g., multiple linters, multiple test suites)
+
+## Quick Start
+
+### 1. Generate Default Configuration Files
+
+```bash
+npx concatenate setup yaml
+```
+
+This creates a `.concatenate/` folder with example configuration files:
+- `fix.yaml` - Auto-fix code issues (runs in series)
+- `check.yaml` - Check code quality (runs in parallel)
+
+### 2. Run a Configuration
+
+```bash
+# Run a specific configuration file
+npx concatenate fix
+
+# Or check code quality
+npx concatenate check
+
+# Interactive mode: select from available configs
+npx concatenate
+```
+
+### What You'll See
+
+When running a configuration, you'll see a real-time task list with progress indicators:
+
+```
+Welcome to Concatenate CLI
+Running file: fix
+
+✔ Fixing with Prettier
+✔ Fixing with ESLint
+```
+
+In parallel mode, all tasks run simultaneously:
+
+```
+Welcome to Concatenate CLI
+Running file: check
+
+✔ Checking with ESLint
+✔ Checking with Prettier
+✔ Checking with TSC
+```
+
+If a task fails, detailed error output is shown at the end.
+
+## Configuration
+
+Configuration files must be placed in a `.concatenate/` directory at your **project root** (where `package.json` is located). Supported formats: YAML (`.yaml`, `.yml`), JSON (`.json`), or JSON5 (`.json5`).
+
+### Configuration Schema
+
+```yaml
+type: series | parallel
+actions:
+  - label: Display name for the task
+    command: Command to execute
+  - label: Another task
+    command: Another command
+```
+
+### YAML Example
+
+**`.concatenate/fix.yaml`**
+```yaml
+type: series
+actions:
+  - label: Fixing with Prettier
+    command: prettier --write --list-different --cache .
+  - label: Fixing with ESLint
+    command: eslint . --fix --format pretty --ext .js,.jsx,.ts,.tsx
+```
+
+### JSON Example
+
+**`.concatenate/check.json`**
+```json
+{
+  "type": "parallel",
+  "actions": [
+    {
+      "label": "Checking with ESLint",
+      "command": "eslint . --format pretty --ext .js,.ts"
+    },
+    {
+      "label": "Checking with Prettier",
+      "command": "prettier --list-different --cache ."
+    },
+    {
+      "label": "Type Checking",
+      "command": "tsc --noEmit"
+    }
+  ]
+}
+```
+
+### Field Descriptions
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `type` | `"series"` \| `"parallel"` | Yes | Execution mode for the actions |
+| `actions` | Array | Yes | List of command actions to execute |
+| `actions[].label` | string | Yes | Display name shown during execution |
+| `actions[].command` | string | Yes | Shell command to execute |
+
+## Commands
+
+### `concatenate [file]`
+
+Execute a configuration file from the `.concatenate/` directory.
+
+**Syntax:**
+```bash
+concatenate [file]
+```
+
+**Arguments:**
+- `file` (optional): Name of the configuration file (without extension)
+
+**Examples:**
+```bash
+# Run fix.yaml or fix.json
+concatenate fix
+
+# Run check.yaml or check.json
+concatenate check
+
+# Run custom-workflow.yaml
+concatenate custom-workflow
+
+# No argument: Interactive selection menu
+concatenate
+```
+
+**Behavior:**
+- Searches for `<file>.yaml`, `<file>.yml`, `<file>.json`, or `<file>.json5` in `.concatenate/`
+- If no file specified, shows an interactive selection menu (use arrow keys to navigate)
+- Must find **exactly one** matching file (errors if 0 or multiple matches with different extensions)
+- Displays real-time progress for each action with labeled tasks (powered by Listr2)
+- Commands execute from your **project root directory** (parent of `.concatenate/`)
+- Commands inherit your current **environment variables**
+
+**Exit Codes:**
+- `0` - All tasks completed successfully
+- `1` - One or more tasks failed or general error
+- `4` - Invalid file extension provided to setup command
+
+---
+
+### `concatenate setup <extension>`
+
+Generate default configuration files in the `.concatenate/` directory.
+
+**Syntax:**
+```bash
+concatenate setup <extension>
+```
+
+**Arguments:**
+- `extension` (required): File format to create (`yaml` or `json`)
+
+**Examples:**
+```bash
+# Create YAML configuration files
+concatenate setup yaml
+
+# Create JSON configuration files
+concatenate setup json
+```
+
+**Generated Files:**
+- `fix.yaml` or `fix.json` - Auto-fix workflow (Prettier + ESLint in series)
+- `check.yaml` or `check.json` - Quality check workflow (ESLint, Prettier, Knip, TSC in parallel)
+
+**Notes:**
+- Creates `.concatenate/` directory if it doesn't exist
+- **Overwrites existing files** without warning
+- Generated templates assume you have ESLint, Prettier, Knip, and TypeScript installed
+
+---
+
+## Examples
+
+### Example 1: CI/CD Pipeline
+
+**`.concatenate/ci.yaml`**
+```yaml
+type: series
+actions:
+  - label: Install Dependencies
+    command: npm ci
+  - label: Run Linters
+    command: concatenate check
+  - label: Run Tests
+    command: npm test
+  - label: Build Project
+    command: npm run build
+```
+
+```bash
+concatenate ci
+```
+
+### Example 2: Pre-commit Checks
+
+**`.concatenate/pre-commit.yaml`**
+```yaml
+type: parallel
+actions:
+  - label: Check Formatting
+    command: prettier --check .
+  - label: Lint Code
+    command: eslint . --max-warnings 0
+  - label: Type Check
+    command: tsc --noEmit
+  - label: Run Unit Tests
+    command: npm run test:unit
+```
+
+```bash
+concatenate pre-commit
+```
+
+### Example 3: Multi-environment Build
+
+**`.concatenate/build-all.yaml`**
+```yaml
+type: parallel
+actions:
+  - label: Build Development
+    command: npm run build:dev
+  - label: Build Staging
+    command: npm run build:staging
+  - label: Build Production
+    command: npm run build:prod
+```
+
+```bash
+concatenate build-all
+```
+
+**Note**: For cross-platform environment variables, define them in package.json scripts or use a package like `cross-env`.
+
+### Example 4: Clean and Reset (Cross-platform)
+
+**`.concatenate/clean.yaml`**
+```yaml
+type: series
+actions:
+  - label: Remove node_modules
+    command: npx shx rm -rf node_modules
+  - label: Remove dist
+    command: npx shx rm -rf dist
+  - label: Clear npm cache
+    command: npm cache clean --force
+  - label: Reinstall dependencies
+    command: npm install
+```
+
+```bash
+concatenate clean
+```
+
+**Note**: Examples use `shx` for cross-platform compatibility. Install with `npm install --save-dev shx`.
+
+## Use Cases
+
+### Development Workflow
+- Combine formatting, linting, and type-checking in one command
+- Run auto-fix commands in the correct order
+
+### Continuous Integration
+- Execute test suites in parallel to speed up CI pipelines
+- Run sequential build and deployment steps
+
+### Code Quality
+- Enforce multiple quality checks before commits
+- Run comprehensive code analysis tools simultaneously
+
+### Multi-project Monorepos
+- Build or test multiple packages concurrently
+- Run workspace-wide operations efficiently
+
+### Database Management
+- Run migration, seeding, and validation commands in sequence
+- Execute parallel database backups
+
+---
+
+## Troubleshooting
+
+### Error: "There was an issue trying to find the configuration file"
+
+**Cause**: No matching file found, or multiple files with the same name but different extensions exist.
+
+**Solution**:
+- Ensure the file exists in `.concatenate/` directory
+- Check that you only have ONE file with the given name (e.g., don't have both `fix.yaml` AND `fix.json`)
+- Verify the file has a supported extension: `.yaml`, `.yml`, `.json`, or `.json5`
+
+### Error: "Unsupported file type"
+
+**Cause**: Configuration file has an unsupported extension.
+
+**Solution**: Rename your file to use `.yaml`, `.yml`, `.json`, or `.json5` extension.
+
+### Error: "The extension provided doesn't match the expected format"
+
+**Cause**: Invalid extension passed to `setup` command.
+
+**Solution**: Use only `yaml` or `json` as the extension argument:
+```bash
+concatenate setup yaml
+# OR
+concatenate setup json
+```
+
+### Tasks hanging or not responding
+
+**Cause**: A command is waiting for user input (e.g., interactive prompts).
+
+**Solution**: Use non-interactive flags for your commands:
+```yaml
+actions:
+  - label: Install dependencies
+    command: npm ci --silent
+```
+
+### Command not found errors
+
+**Cause**: Commands run from the project root, not from `.concatenate/` directory.
+
+**Solution**: Use paths relative to project root, or use `npx` to run local binaries:
+```yaml
+actions:
+  - label: Run local script
+    command: npx my-local-tool
+```
+
+### Cross-platform compatibility issues
+
+**Cause**: Using platform-specific commands (e.g., `rm -rf` on Windows).
+
+**Solution**: Use cross-platform alternatives:
+- Use `shx` package for file operations
+- Use `cross-env` for environment variables
+- Use `npm scripts` that handle platform differences
+
+## Tips and Best Practices
+
+1. **Use Series for Dependencies**: If one command depends on another's output, use `type: series`
+2. **Use Parallel for Speed**: Independent checks (linting, formatting) run faster in parallel
+3. **Descriptive Labels**: Use clear labels so you can see which task is running/failing
+4. **Exit Codes Matter**: Commands that exit with non-zero codes will cause the workflow to fail
+5. **Environment Variables**: Commands inherit your shell environment variables
+6. **Non-interactive Commands**: Avoid commands that require user input - they will hang
+7. **Cross-platform Compatibility**: Use tools like `shx` or `cross-env` for platform-independent commands
+8. **File Paths**: All commands execute from project root, not from `.concatenate/`
+9. **npm Scripts Integration**: Add concatenate commands to your `package.json` scripts:
+   ```json
+   {
+     "scripts": {
+       "fix": "concatenate fix",
+       "check": "concatenate check",
+       "ci": "concatenate ci"
+     }
+   }
+   ```
+10. **JSON5 Support**: You can use `.json5` files for comments and trailing commas in your configuration
+
+## License
+
+MIT © MedianAura
+
+## Repository
+
+[https://github.com/MedianAura/concatenate](https://github.com/MedianAura/concatenate)
