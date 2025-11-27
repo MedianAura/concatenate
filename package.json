@@ -24,6 +24,11 @@
     "start": "node bin/run.js",
     "start:branch": "node bin/run.js branch",
     "start:setup": "node bin/run.js setup yaml",
+    "test": "vitest run",
+    "test:ui": "vitest --ui",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:coverage:open": "npm run test:coverage && open-cli coverage/index.html",
     "watch": "shx rm -rf dist && tsc -b --watch"
   },
   "config": {
@@ -56,6 +61,9 @@
     "@types/update-notifier": "^6.0.8",
     "@typescript-eslint/eslint-plugin": "^7.8.0",
     "@typescript-eslint/parser": "^7.8.0",
+    "@vitest/coverage-v8": "^4.0.14",
+    "@vitest/ui": "^4.0.14",
+    "alias-kitchen": "^0.2.4",
     "cz-conventional-changelog": "^3.3.0",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^9.1.0",
@@ -72,11 +80,13 @@
     "eslint-plugin-unused-imports": "^3.2.0",
     "eslint-plugin-zod": "^1.4.0",
     "knip": "^5.11.0",
+    "open-cli": "^8.0.0",
     "prettier": "^3.2.5",
     "shx": "^0.3.4",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.5",
-    "typescript-eslint": "^7.8.0"
+    "typescript-eslint": "^7.8.0",
+    "vitest": "^4.0.14"
   },
   "engines": {
     "node": ">=18.0.0"
