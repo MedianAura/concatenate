@@ -14,7 +14,8 @@ program
   .description(packageJSON.description ?? '')
   .version(packageJSON.version)
   .argument('[file]', 'command file to execute')
-  .action(async (file: string) => {
+  .argument('[actionIds...]', 'action IDs to execute (space-separated)')
+  .action(async (file: string, actionIds: string[] | undefined) => {
     if (!file) {
       Logger.warn('No file provded. Selecting a file...');
       file = await getConfigFile();
@@ -23,7 +24,7 @@ program
     }
 
     Logger.title(`Running file: ${file}`);
-    await new CommandRunner().run(file);
+    await new CommandRunner().run(file, actionIds);
   });
 
 program

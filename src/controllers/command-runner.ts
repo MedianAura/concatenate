@@ -8,6 +8,8 @@ import path from 'node:path';
 import type { Readable } from 'node:stream';
 import { parse as parseYaml } from 'yaml';
 import { getConcatenateDirectoryPath } from '../helpers/root-directory-path.js';
+import { Logger } from '../helpers/logger.js';
+import type { ActionModelSchema } from '../models/action-model.js';
 import { ConfigurationModel, type ConfigurationModelSchema } from '../models/configuration-model.js';
 
 const parseJSON = json5.parse;
@@ -47,8 +49,15 @@ function printContext(context: ListrContext): void {
 }
 
 export class CommandRunner {
-  public async run(config: string): Promise<void> {
+  public async run(config: string, actionIds?: string[]): Promise<void> {
     const data = await this.validateData(config);
+
+    // Filter actions if IDs are provided
+    let actions = data.actions;
+    if (actionIds && actionIds.length > 0) {
+      actions = this.filterActionsByIds(data.actions, actionIds);
+    }
+
     const globalContext = { reports: [] as ListrContextReport[] };
 
     const tasks = new Listr<ListrContext>([], {
@@ -61,7 +70,7 @@ export class CommandRunner {
       ctx: globalContext,
     });
 
-    for (const action of data.actions) {
+    for (const action of actions) {
       tasks.add([
         {
           title: action.label,
@@ -137,5 +146,42 @@ export class CommandRunner {
     const data = this.parseConfigData(configFile, dataString);
 
     return ConfigurationModel.parse(data);
+  }
+
+  private filterActionsByIds(actions: ActionModelSchema[], requestedIds: string[]): ActionModelSchema[] {
+    // Check for duplicate IDs in configuration
+    const idCounts = new Map<string, number>();
+    for (const action of actions) {
+      if (action.id) {
+        idCounts.set(action.id, (idCounts.get(action.id) || 0) + 1);
+      }
+    }
+
+    const duplicateIds = [...idCounts.entries()].filter(([_, count]) => count > 1).map(([id]) => id);
+
+    if (duplicateIds.length > 0) {
+      throw new Error(`Duplicate action IDs found in configuration: ${duplicateIds.join(', ')}. Each action must have a unique ID.`);
+    }
+
+    // Get actions with IDs and available IDs
+    const actionsWithIds = actions.filter((action) => action.id !== undefined);
+    const availableIds = new Set(actionsWithIds.map((action) => action.id!));
+
+    // Check if requested IDs exist
+    const missingIds = requestedIds.filter((id) => !availableIds.has(id));
+    if (missingIds.length > 0) {
+      const availableIdsList = [...availableIds].join(', ');
+      throw new Error(`The following action IDs were not found: ${missingIds.join(', ')}.\n` + `Available IDs: ${availableIdsList || '(none - no actions have IDs defined)'}`);
+    }
+
+    // Warn about actions without IDs that will be excluded
+    const actionsWithoutIds = actions.filter((action) => action.id === undefined);
+    if (actionsWithoutIds.length > 0) {
+      Logger.warn(`Warning: Some actions do not have IDs defined and will be excluded.\n` + `Actions without IDs: ${actionsWithoutIds.map((a) => a.label).join(', ')}`);
+      Logger.skipLine();
+    }
+
+    // Filter to only requested IDs (preserving order from configuration)
+    return actions.filter((action) => action.id && requestedIds.includes(action.id));
   }
 }
