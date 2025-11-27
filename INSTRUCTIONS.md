@@ -35,8 +35,10 @@ Refer to the type listed below (DO NOT include AI attribution or co-author tags)
 ```
 <type>: <description>
 
-<required body>
+<body>
 ```
+
+Where `<body>` is a brief explanation of what the commit does and why. It should be 1-3 sentences describing the changes and their purpose.
 
 Common types: `feat`, `ui`, `ux`, `fix`, `maintenance`, `dep`, `docs`, `refactor`, `test`
 
@@ -54,12 +56,29 @@ Common types: `feat`, `ui`, `ux`, `fix`, `maintenance`, `dep`, `docs`, `refactor
 
 Examples:
 
-- `feat: add user authentication flow`
-- `ui: update button styling and layout`
-- `ux: improve form validation feedback`
-- `fix: resolve navigation routing issue`
-- `maintenance: add test scripts to package.json`
-- `dep: update PrimeVue to latest version`
+- `feat: add user authentication flow
+
+  Implemented JWT-based authentication with login/logout endpoints and middleware for protected routes.`
+
+- `ui: update button styling and layout
+
+  Updated button components with new design system colors and improved accessibility.`
+
+- `ux: improve form validation feedback
+
+  Enhanced form validation to show real-time feedback and clearer error messages.`
+
+- `fix: resolve navigation routing issue
+
+  Fixed a bug where navigation links were not updating the URL correctly in nested routes.`
+
+- `maintenance: add test scripts to package.json
+
+  Added npm scripts for running tests in different modes to improve developer workflow.`
+
+- `dep: update PrimeVue to latest version
+
+  Updated PrimeVue from v3.15 to v3.20 to include new components and bug fixes.`
 
 #### Commit Organization
 
