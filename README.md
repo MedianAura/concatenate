@@ -196,28 +196,30 @@ actions:
 
 ### Field Descriptions
 
-| Field               | Type                       | Required | Description                                                                                     |
-| ------------------- | -------------------------- | -------- | ----------------------------------------------------------------------------------------------- |
-| `type`              | `"series"` \| `"parallel"` | Yes      | Execution mode for the actions                                                                  |
-| `actions`           | Array                      | Yes      | List of command actions to execute                                                              |
-| `actions[].label`   | string                     | Yes      | Display name shown during execution. Use clear and descriptive labels to easily identify tasks. |
-| `actions[].command` | string                     | Yes      | Shell command to execute                                                                        |
+| Field               | Type                       | Required | Description                                                                                                                                    |
+| ------------------- | -------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `type`              | `"series"` \| `"parallel"` | Yes      | Execution mode for the actions                                                                                                                 |
+| `actions`           | Array                      | Yes      | List of command actions to execute                                                                                                             |
+| `actions[].id`      | string                     | No       | Unique identifier for the action. Required only if you want to filter and run specific actions by ID. Must be unique within the configuration. |
+| `actions[].label`   | string                     | Yes      | Display name shown during execution. Use clear and descriptive labels to easily identify tasks.                                                |
+| `actions[].command` | string                     | Yes      | Shell command to execute                                                                                                                       |
 
 ## Commands
 
-### `concatenate [file]`
+### `concatenate [file] [actionIds...]`
 
-Execute a configuration file from the `.concatenate/` directory.
+Execute a configuration file from the `.concatenate/` directory, optionally filtering to run only specific actions.
 
 **Syntax:**
 
 ```bash
-concatenate [file]
+concatenate [file] [actionIds...]
 ```
 
 **Arguments:**
 
 - `file` (optional): Name of the configuration file (without extension)
+- `actionIds` (optional): Space-separated list of action IDs to execute. If provided, only actions with matching IDs will run. All specified IDs must exist in the configuration.
 
 **Examples:**
 
@@ -230,6 +232,12 @@ concatenate check
 
 # Run custom-workflow.yaml
 concatenate custom-workflow
+
+# Filter to run only specific actions by ID
+concatenate check eslint prettier
+
+# Run multiple specific actions from fix workflow
+concatenate fix eslint
 
 # No argument: Interactive selection menu
 concatenate
@@ -245,6 +253,15 @@ concatenate
 - Commands inherit your current **environment variables**.
 - Commands that exit with non-zero codes will cause the workflow to fail (in series mode).
 - Avoid commands that require user input, as they will hang the process. Use non-interactive flags where possible.
+
+**Action ID Filtering:**
+
+- When action IDs are provided, only actions with matching IDs will execute
+- Execution order is preserved from the configuration file, not from the command-line order
+- All requested action IDs must exist in the configuration or an error will be raised
+- If a configuration has mixed actions (some with IDs, some without), only actions with matching IDs will run
+- Duplicate action IDs within a configuration will cause an error
+- Actions without IDs cannot be selected for filtering
 
 **Exit Codes:**
 
@@ -390,6 +407,52 @@ concatenate clean
 
 **Note**: Examples use `shx` for cross-platform compatibility. Install with `npm install --save-dev shx`.
 
+### Example 5: Action ID Filtering for Selective Execution
+
+This example demonstrates how to use action IDs to selectively run specific actions from a configuration. This is useful in CI/CD pipelines where you may want to run only certain checks in parallel environments.
+
+**`.concatenate/check.yaml`**
+
+```yaml
+type: parallel
+actions:
+  - id: eslint
+    label: Checking with ESLint
+    command: eslint . --format pretty
+  - id: prettier
+    label: Checking with Prettier
+    command: prettier --list-different --cache .
+  - id: knip
+    label: Checking with Knip
+    command: knip
+  - id: tsc
+    label: Checking with TSC
+    command: tsc --noEmit
+```
+
+**Usage Examples:**
+
+```bash
+# Run all checks (no ID filtering)
+concatenate check
+
+# Run only ESLint and TypeScript checks
+concatenate check eslint tsc
+
+# Run only Prettier check
+concatenate check prettier
+
+# In CI, run only fast checks
+concatenate check eslint prettier
+```
+
+**Use Cases:**
+
+- **Parallel CI environments**: Run only specific checks on different agents to speed up pipelines
+- **Local pre-commit**: Run only fast checks locally, save slower checks for CI
+- **Selective debugging**: Run only the checks you're debugging during development
+- **Skip slow operations**: Skip slow checks (like knip) during rapid development cycles
+
 ## Troubleshooting
 
 ### Error: "There was an issue trying to find the configuration file"
@@ -443,6 +506,61 @@ actions:
   - label: Run local script
     command: npx my-local-tool
 ```
+
+### Action ID filtering errors
+
+#### Error: "The following action IDs were not found"
+
+**Cause**: One or more requested action IDs don't exist in the configuration.
+
+**Solution**:
+
+- Check the action ID names in your configuration file
+- View available IDs in the error message
+- Ensure IDs are spelled correctly and match case-sensitive
+
+```bash
+# Example: Check which IDs are available
+concatenate check invalid-id  # Shows available IDs in error
+```
+
+#### Error: "Duplicate action IDs found in configuration"
+
+**Cause**: Two or more actions in your configuration have the same ID.
+
+**Solution**:
+
+- Open your configuration file and ensure each action has a unique ID
+- IDs must be unique within the same configuration file
+
+```yaml
+# ❌ Wrong: Duplicate IDs
+actions:
+  - id: eslint
+    label: First lint check
+    command: eslint .
+  - id: eslint  # ERROR: Duplicate!
+    label: Second lint check
+    command: eslint --fix .
+
+# ✅ Correct: Unique IDs
+actions:
+  - id: eslint-check
+    label: Check linting
+    command: eslint .
+  - id: eslint-fix
+    label: Fix linting
+    command: eslint --fix .
+```
+
+#### Warning: "Some actions do not have IDs defined and will be excluded"
+
+**Cause**: Your configuration has mixed actions (some with IDs, some without), and you're filtering by ID. Actions without IDs will be excluded.
+
+**Solution**:
+
+- Either add IDs to all actions that you might want to filter, or
+- Don't filter if you want to run all actions including those without IDs
 
 ### Cross-platform compatibility issues
 
