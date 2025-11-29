@@ -6,5 +6,4 @@
 /tmp
 /node_modules
 /coverage
-/.claude
 .eslintcache
