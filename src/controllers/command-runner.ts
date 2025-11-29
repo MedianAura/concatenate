@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { execaCommand, ExecaError, type Result } from 'execa';
 import { globby } from 'globby';
-import { parse as parseJSON } from 'json5';
+import json5 from 'json5';
 import { Listr } from 'listr2';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -11,6 +11,10 @@ import { Logger } from '../helpers/logger.js';
 import { getConcatenateDirectoryPath } from '../helpers/root-directory-path.js';
 import type { ActionModelSchema } from '../models/action-model.js';
 import { ConfigurationModel, type ConfigurationModelSchema } from '../models/configuration-model.js';
+
+// Need to be disable to work once compiled with TSC.
+// eslint-disable-next-line import-x/no-named-as-default-member
+const { parse: parseJSON } = json5;
 
 interface ListrContextReport {
   title: string;
@@ -40,7 +44,7 @@ function handleOutput(status: Result | ExecaError, action: string, context: List
 
 function printContext(context: ListrContext): void {
   for (const report of context.reports) {
-    if (report.exitCode === 0) continue;
+    if (report.message.trim() === '') continue;
 
     console.log(`\n\n${chalk.bgYellow(report.title)}`);
     console.log('---------------------------------');
@@ -99,8 +103,8 @@ export class CommandRunner {
       throw new TypeError('Some tasks failed');
     }
 
+    printContext(globalContext);
     if (globalContext.reports.some((report) => report.exitCode !== 0)) {
-      printContext(globalContext);
       throw new TypeError('Some tasks failed');
     }
   }

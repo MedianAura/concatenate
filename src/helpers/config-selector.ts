@@ -1,7 +1,11 @@
-import { prompt } from 'enquirer';
+import enquirer from 'enquirer';
 import { globby } from 'globby';
 import path from 'node:path';
 import { getConcatenateDirectoryPath } from './root-directory-path.js';
+
+// Need to be disable to work once compiled with TSC.
+// eslint-disable-next-line import-x/no-named-as-default-member
+const { prompt } = enquirer;
 
 export async function getConfigFile(): Promise<string> {
   const rootDirectory = getConcatenateDirectoryPath();

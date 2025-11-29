@@ -16,19 +16,19 @@
     "./dist"
   ],
   "scripts": {
-    "build": "shx rm -rf dist && tsc -b",
+    "build": "shx rm -rf dist && tsc -p tsconfig.build.json",
     "check": "concatenate check",
     "check:knip": "knip",
     "fix": "concatenate fix",
     "release": "automaton version",
-    "start": "node bin/run.js",
+    "start": "node bin/run.js check",
     "start:setup": "node bin/run.js setup yaml",
     "test": "vitest run",
     "test:ui": "vitest --ui",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:coverage:open": "npm run test:coverage && open-cli coverage/index.html",
-    "watch": "shx rm -rf dist && tsc -b --watch"
+    "watch": "shx rm -rf dist && tsc -p tsconfig.build.json --watch"
   },
   "dependencies": {
     "chalk": "^5.6.2",
