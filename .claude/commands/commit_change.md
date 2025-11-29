@@ -43,17 +43,18 @@ Create a git commit following the project's commit message format specified in I
    - Focus on the "why" rather than just the "what"
 
 5. **Stage and Commit**:
-   - Add relevant untracked files to the staging area with `git add`
-   - Create the commit using a HEREDOC format:
-     ```bash
-     git commit -m "$(cat <<'EOF'
-     <type>: <description>
+    - Add relevant untracked files to the staging area with `git add`
+    - Write the commit message to `.git/COMMIT_EDITMSG`:
+      ```bash
+      echo "<type>: <description>
 
-     <body>
-     EOF
-     )"
-     ```
-   - Run `git status` after the commit to verify success
+      <body>" > .git/COMMIT_EDITMSG
+      ```
+    - Create the commit (Git will automatically use the message file):
+      ```bash
+      git commit
+      ```
+    - Run `git status` after the commit to verify success
 
 6. **Handle Pre-commit Hooks**: If the commit fails due to pre-commit hook changes:
    - Check authorship: `git log -1 --format='%an %ae'`

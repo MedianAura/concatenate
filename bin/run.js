@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { readPackageSync } from 'read-pkg';
-import { default as updateNotifier } from 'update-notifier';
+import updateNotifier from 'update-notifier';
 import { run } from '../dist/src/index.js';
 
 const packageJSON = await readPackageSync();
@@ -11,5 +11,6 @@ updateNotifier({
 }).notify();
 
 const status = await run();
-// eslint-disable-next-line n/no-process-exit
+
+// eslint-disable-next-line no-undef
 process.exit(status);

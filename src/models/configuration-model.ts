@@ -1,4 +1,4 @@
-import z from 'zod';
+import { z } from 'zod';
 import { ActionModel } from './action-model.js';
 
 const ConfigurationType = ['series', 'parallel'] as const;

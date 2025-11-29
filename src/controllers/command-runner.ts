@@ -1,7 +1,7 @@
 import chalk from 'chalk';
-import { execaCommand, type ExecaReturnValue } from 'execa';
+import { execaCommand, ExecaError, type Result } from 'execa';
 import { globby } from 'globby';
-import json5 from 'json5';
+import { parse as parseJSON } from 'json5';
 import { Listr } from 'listr2';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -11,8 +11,6 @@ import { Logger } from '../helpers/logger.js';
 import { getConcatenateDirectoryPath } from '../helpers/root-directory-path.js';
 import type { ActionModelSchema } from '../models/action-model.js';
 import { ConfigurationModel, type ConfigurationModelSchema } from '../models/configuration-model.js';
-
-const parseJSON = json5.parse;
 
 interface ListrContextReport {
   title: string;
@@ -26,14 +24,16 @@ interface ListrContext {
   reports: ListrContextReport[];
 }
 
-function handleOutput(status: ExecaReturnValue<string>, action: string, context: ListrContext): void {
-  const messages: string[] = [status.stderr.toString(), status.stdout.toString()];
+function handleOutput(status: Result | ExecaError, action: string, context: ListrContext): void {
+  const stderr = status.stderr?.toString() ?? '';
+  const stdout = status.stdout?.toString() ?? '';
+  const messages: string[] = [stderr, stdout];
 
   context.reports.push({
     title: action,
     exitCode: status.exitCode ?? 0,
-    stdout: status.stdout ?? '',
-    stderr: status.stderr ?? '',
+    stdout,
+    stderr,
     message: messages.join('\n\n').trim(),
   });
 }
@@ -84,7 +84,7 @@ export class CommandRunner {
 
               handleOutput(status, action.label, context);
             } catch (error: unknown) {
-              handleOutput(error as ExecaReturnValue<string>, action.label, context);
+              handleOutput(error as ExecaError, action.label, context);
               throw new Error(action.label);
             }
           },
