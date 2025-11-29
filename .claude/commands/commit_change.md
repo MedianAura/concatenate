@@ -48,9 +48,9 @@ Create a git commit following the project's commit message format specified in I
        ```bash
        printf "<type>: <description>\n\n<body>\n" > .git/COMMIT_EDITMSG
        ```
-     - Create the commit (Git will automatically use the message file):
+     - Create the commit using the message file:
        ```bash
-       git commit
+       git commit -F .git/COMMIT_EDITMSG
        ```
      - Run `git status` after the commit to verify success
 
