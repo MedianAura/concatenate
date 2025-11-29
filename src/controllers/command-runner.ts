@@ -148,7 +148,7 @@ export class CommandRunner {
     return ConfigurationModel.parse(data);
   }
 
-  private filterActionsByIds(actions: ActionModelSchema[], requestedIds: string[]): ActionModelSchema[] {
+  protected filterActionsByIds(actions: ActionModelSchema[], requestedIds: string[]): ActionModelSchema[] {
     // Check for duplicate IDs in configuration
     const idCounts = new Map<string, number>();
     for (const action of actions) {

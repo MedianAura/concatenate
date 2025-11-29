@@ -18,6 +18,7 @@
   "scripts": {
     "build": "shx rm -rf dist && tsc -b",
     "check": "concatenate check",
+    "check:knip": "knip",
     "create:version": "automaton version",
     "fix": "concatenate fix",
     "release": "automaton version",

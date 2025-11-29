@@ -1,7 +1,7 @@
+import { CommandRunner } from '@/controllers/command-runner.js';
+import { Logger } from '@/helpers/logger.js';
+import type { ActionModelSchema } from '@/models/action-model.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CommandRunner } from '../../src/controllers/command-runner.js';
-import { Logger } from '../../src/helpers/logger.js';
-import type { ActionModelSchema } from '../../src/models/action-model.js';
 
 // Type to access private methods for testing
 type CommandRunnerWithPrivates = CommandRunner & {

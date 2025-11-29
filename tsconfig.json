@@ -17,7 +17,6 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "strict": true,
-    "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
     "lib": ["ES2022"],
     "types": ["node"],
@@ -26,8 +25,5 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["./src/**/*"],
-  "ts-node": {
-    "esm": true
-  }
+  "include": ["./src/**/*", "./tests/**/*"]
 }

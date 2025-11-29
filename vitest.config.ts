@@ -1,6 +1,10 @@
+import { kitchen } from 'alias-kitchen';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  resolve: {
+    alias: kitchen({ recipe: 'vite' }),
+  },
   test: {
     coverage: {
       provider: 'v8',

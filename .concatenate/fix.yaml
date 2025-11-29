@@ -5,4 +5,4 @@ actions:
     command: prettier --write --list-different --cache .
   - id: eslint
     label: Fixing with ESLint
-    command: eslint . --fix --format pretty --ext .js,.jsx,.cjs,.mjs,.ts,.cts,.mts,.tsx,.cts,.mts,.vue
+    command: eslint . --fix --format pretty --cache
