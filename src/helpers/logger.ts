@@ -1,13 +1,15 @@
 import chalk from 'chalk';
-import { createLogUpdate } from 'log-update';
 
 function print(message: string): void {
-  const log = createLogUpdate(process.stdout, {
-    showCursor: true,
-  });
-
-  log(message);
-  log.done();
+  // Was `createLogUpdate(...)` followed immediately by `log.done()`, which never redrew
+  // anything -- so log-update contributed only its hard wrap at the terminal width.
+  // Outside a TTY that width is 80, and it broke messages mid-word:
+  //
+  //   [ERROR] Import "./other" in .concatenate/default.yaml must include a file exte
+  //   nsion
+  //
+  // A plain write leaves wrapping to the terminal, which knows its own width.
+  process.stdout.write(message);
 }
 
 function clear(): void {

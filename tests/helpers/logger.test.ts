@@ -1,18 +1,10 @@
 import { Logger } from '@/helpers/logger.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// log-update writes through its own stream handling, so the assertions target the
-// write calls rather than captured text.
+// Logger writes straight to process.stdout, so the assertions target the write calls
+// rather than captured text. No module mock: log-update is gone, and a spy on the stream
+// is both closer to what happens and immune to the hard wrap that made it worth removing.
 const writes: string[] = [];
-
-const logUpdate = Object.assign(
-  (message: string): void => {
-    writes.push(message);
-  },
-  { done: (): void => {} },
-);
-
-vi.mock('log-update', () => ({ createLogUpdate: () => logUpdate }));
 
 describe('Logger', () => {
   let isTTY: boolean | undefined;
@@ -20,6 +12,10 @@ describe('Logger', () => {
   beforeEach(() => {
     writes.length = 0;
     isTTY = process.stdout.isTTY;
+    vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown): boolean => {
+      writes.push(String(chunk));
+      return true;
+    });
   });
 
   afterEach(() => {

@@ -9,7 +9,6 @@
   "license": "MIT",
   "author": "MedianAura",
   "type": "module",
-  "packageManager": "pnpm@11.17.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
@@ -28,11 +27,11 @@
     "start": "node bin/run.js check",
     "start:setup": "node bin/run.js setup yaml",
     "test": "vitest run",
-    "test:unit": "vitest run --project unit",
-    "test:e2e": "vitest run --project e2e",
     "test:coverage": "vitest run --project unit --coverage",
     "test:coverage:open": "npm run test:coverage && open-cli coverage/index.html",
+    "test:e2e": "vitest run --project e2e",
     "test:ui": "vitest --ui",
+    "test:unit": "vitest run --project unit",
     "test:watch": "vitest",
     "watch": "shx rm -rf dist && tsc -p tsconfig.build.json --watch"
   },
@@ -46,7 +45,6 @@
     "globby": "^16.2.2",
     "json5": "^2.2.3",
     "listr2": "^11.0.0",
-    "log-update": "^8.0.0",
     "update-notifier": "^7.3.1",
     "yaml": "^2.9.0",
     "zod": "^4.4.3"
@@ -81,6 +79,7 @@
     "typescript-eslint": "^8.65.0",
     "vitest": "^4.1.10"
   },
+  "packageManager": "pnpm@11.17.0",
   "engines": {
     "node": ">=22.12.0"
   }
