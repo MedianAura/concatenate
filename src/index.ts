@@ -7,9 +7,9 @@ import { getConfigFile } from './helpers/config-selector.js';
 import { Logger } from './helpers/logger.js';
 import type { SetupFileExtensionType } from './models/command-model.js';
 
-// Résolu depuis l'emplacement du module, pas depuis process.cwd() : sinon `--version`
-// et `--help` rapportent le package du projet qui invoque concatenate. src/ et dist/
-// sont tous deux à un niveau sous la racine, donc le chemin vaut en dev comme en build.
+// Resolved from the module location, not process.cwd(): otherwise `--version` and
+// `--help` report the package of the project invoking concatenate. src/ and dist/ are
+// both one level under the root, so the relative path holds in dev and in the build.
 const packageJSON = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), { encoding: 'utf8' })) as {
   description?: string;
   name: string;
@@ -23,8 +23,20 @@ program
   .argument('[file]', 'command file to execute')
   .argument('[actionIds...]', 'action IDs to execute (space-separated)')
   .action(async (file: string, actionIds: string[] | undefined) => {
+    // The banner belongs to the command that actually runs something. Emitting it from
+    // `run()` meant `--version` and `--help` cleared the screen and printed a welcome
+    // line before commander had decided what the invocation even was.
+    Logger.clear();
+    Logger.title('Welcome to Concatenate CLI');
+
     if (!file) {
-      Logger.warn('No file provded. Selecting a file...');
+      // Without a TTY the enquirer prompt has nothing to read and hangs until the job
+      // times out. Failing with a usable message beats blocking a CI run.
+      if (!process.stdin.isTTY) {
+        throw new Error('No file provided. Pass one as an argument: stdin is not a TTY, so the file cannot be selected interactively.');
+      }
+
+      Logger.warn('No file provided. Selecting a file...');
       file = await getConfigFile();
 
       Logger.skipLine();
@@ -43,9 +55,6 @@ program
   });
 
 export async function run(): Promise<number> {
-  Logger.clear();
-  Logger.title('Welcome to Concatenate CLI');
-
   try {
     await program.parseAsync();
   } catch (error: unknown) {

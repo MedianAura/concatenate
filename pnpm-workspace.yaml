@@ -2,8 +2,8 @@ allowBuilds:
   esbuild: true
   unrs-resolver: true
 minimumReleaseAgeStrict: true
-# Le délai de maturité protège des publications tierces compromises. Nos propres
-# paquets sont publiés depuis ces dépôts : les consommer le jour même est le but.
+# The maturity delay guards against compromised third-party publishes. Our own
+# packages are published from these repos, so consuming them same-day is the point.
 minimumReleaseAgeExclude:
   - '@medianaura/*'
 onlyBuiltDependencies:

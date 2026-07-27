@@ -19,7 +19,7 @@
     "strict": true,
     "noImplicitOverride": true,
     "lib": ["ES2022"],
-    "types": ["node"],
+    "types": ["node", "vitest/globals"],
     "paths": {
       "@/*": ["./src/*"]
     }

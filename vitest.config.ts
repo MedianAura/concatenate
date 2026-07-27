@@ -3,12 +3,13 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   resolve: {
-    // Doit refléter `paths` de tsconfig.json : les tests importent via `@/`.
+    // Must mirror `paths` in tsconfig.json: the tests import through `@/`.
     alias: {
       '@': fileURLToPath(new URL('src', import.meta.url)),
     },
   },
   test: {
+    globals: true,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
@@ -19,5 +20,30 @@ export default defineConfig({
         statements: 90,
       },
     },
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'unit',
+          include: ['./tests/**/*.test.ts'],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'e2e',
+          include: ['./tests/e2e/**/*.spec.ts'],
+          // The cases run `bin/run.js`, which imports `dist/`: it has to exist before
+          // the first one. In globalSetup rather than a `pretest` script so a bare
+          // `vitest` stays correct.
+          globalSetup: './tests/e2e/global-setup.ts',
+          // Each case pays CLI boot, so they run concurrently and need the slots.
+          maxConcurrency: 12,
+          // A node subprocess per case, plus the tsc build up front.
+          testTimeout: 30_000,
+          hookTimeout: 60_000,
+        },
+      },
+    ],
   },
 });

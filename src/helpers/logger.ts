@@ -11,6 +11,11 @@ function print(message: string): void {
 }
 
 function clear(): void {
+  // Clearing the screen is a terminal operation. On a pipe or a file the ANSI escapes
+  // are corruption, not formatting -- they land in CI logs and in anything parsing
+  // stdout. The guard lives here so no caller has to remember it.
+  if (!process.stdout.isTTY) return;
+
   process.stdout.write('\u{1B}[2J');
   process.stdout.write('\u{1B}[0f');
 }

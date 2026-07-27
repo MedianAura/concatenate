@@ -77,14 +77,14 @@ export class CommandRunner {
           title: action.label,
           task: async (context): Promise<void> => {
             try {
-              // execa 10 a retiré `execaCommand` : même découpage sans shell, en deux temps.
+              // execa 10 removed `execaCommand`: same shell-less splitting, in two steps.
               const [file, ...commandArguments] = parseCommandString(action.command);
               const status = await execa(file, commandArguments, {
                 cwd: path.resolve(getConcatenateDirectoryPath(), '..'),
                 stdio: 'pipe',
-                // Les commandes visent les binaires du projet vérifié (eslint, tsc…).
-                // Sans ça, seul le PATH hérité les résout — ce qui marche sous `pnpm run`
-                // mais pas depuis une installation globale de la CLI.
+                // Commands target the checked project's binaries (eslint, tsc, ...).
+                // Without this only the inherited PATH resolves them, which works under
+                // `pnpm run` but not from a global install of the CLI.
                 preferLocal: true,
                 env: { ...process.env, FORCE_COLOR: '1' },
               });

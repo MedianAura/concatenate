@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 import { run } from '../dist/index.js';
 
-// `update-notifier` coûte ~350 ms d'import, soit le tiers du démarrage. Il n'a rien
-// à afficher quand la sortie n'est pas un terminal : hors TTY, il sort du chemin
-// critique entièrement — import compris, d'où le `await import()` dans la branche.
+// `update-notifier` costs ~350 ms to import, a third of startup. It has nothing to
+// show when stdout is not a terminal, so outside a TTY it leaves the critical path
+// entirely -- the import included, hence the `await import()` inside the branch.
 if (process.stdout.isTTY) {
   const { readFileSync } = await import('node:fs');
   const { default: updateNotifier } = await import('update-notifier');
 
-  // Depuis l'emplacement du module, pas process.cwd() : autrement update-notifier
-  // interroge le registre pour le package du projet appelant.
+  // From the module location, not process.cwd(): otherwise update-notifier queries
+  // the registry for the calling project's package.
   const packageJSON = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), { encoding: 'utf8' }));
 
   updateNotifier({

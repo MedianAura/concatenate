@@ -12,12 +12,12 @@ import { configs as tseslintConfigs } from 'typescript-eslint';
 import js from '@eslint/js';
 import { recommended as eslintComments } from '@eslint-community/eslint-plugin-eslint-comments/configs';
 
-// Les fichiers de config à la racine (knip.config.ts) sont du TS aussi : sans eux
-// dans ce glob, aucun parseur TS ne s'applique et `import type` ne parse pas.
+// The root config files (knip.config.ts) are TS too: without them in this glob no TS
+// parser applies and `import type` fails to parse.
 const TS_FILES = ['**/*.ts'];
 const ALL_FILES = ['**/*.{js,mjs,cjs,ts,mts,cts}'];
 
-// simple-import-sort et unused-imports ne publient aucun config : plugin seul.
+// simple-import-sort and unused-imports ship no config, so register the plugins only.
 const pluginOnly = {
   files: ALL_FILES,
   plugins: {
@@ -25,7 +25,7 @@ const pluginOnly = {
     'unused-imports': unusedImports,
   },
   rules: {
-    // Effets de bord, puis paquets nus, puis `@scope/…`, puis chemins relatifs.
+    // Side effects, then bare packages, then `@scope/...`, then relative paths.
     'simple-import-sort/imports': [2, { groups: [[String.raw`^\u0000`, '^', String.raw`^@\w`, String.raw`^\.`]] }],
     '@typescript-eslint/no-unused-vars': 0,
     'unused-imports/no-unused-imports': 2,
@@ -33,7 +33,7 @@ const pluginOnly = {
   },
 };
 
-// `n/no-missing-import` ne suit pas la réécriture `.js` -> `.ts` de NodeNext.
+// `n/no-missing-import` does not follow NodeNext's `.js` -> `.ts` rewriting.
 const nodeOverrides = {
   files: ALL_FILES,
   rules: {
@@ -41,10 +41,10 @@ const nodeOverrides = {
   },
 };
 
-// Les fichiers de configuration ont pour raison d'être leurs effets de bord.
-// `src/index.ts` est le câblage de la CLI : l'enregistrement des commandes commander
-// est l'objet même du module, pas un accident. `bin/run.js` est le shim exécutable :
-// son code de sortie est le contrat avec le shell, d'où le `process.exit`.
+// Config files exist for their side effects. `src/index.ts` is the CLI wiring: the
+// commander command registration is the whole point of the module, not an accident.
+// `bin/run.js` is the executable shim, and its exit code is the contract with the
+// shell -- hence the `process.exit`.
 const configFiles = {
   files: ['*.config.{js,mjs,cjs,ts,mts}', 'knip.config.ts', 'bin/run.js', 'src/index.ts'],
   rules: {
@@ -55,9 +55,9 @@ const configFiles = {
   },
 };
 
-// unicorn 72 impose privé-avant-public. La base de code suit la convention inverse
-// (API publique en tête), qui n'a jamais été un accident — désactivé plutôt que de
-// réordonner toutes les classes pour une préférence stylistique non choisie.
+// unicorn 72 enforces private-before-public. This codebase follows the opposite
+// convention (public API first), which was never an accident -- disabled rather than
+// reordering every class for a stylistic preference nobody chose.
 const classMemberOrder = {
   files: TS_FILES,
   rules: {
@@ -71,7 +71,7 @@ export default defineConfig([
     'coverage/**',
     'node_modules/**',
     'reports/**',
-    // Hors de tout tsconfig : le parseur ne peut pas le résoudre.
+    // Outside every tsconfig: the parser cannot resolve it.
     'automaton.config.mts',
   ]),
 
@@ -88,8 +88,8 @@ export default defineConfig([
   n.configs['flat/recommended'],
   importX.recommended,
   importX.typescript,
-  // eslint-import-resolver-typescript v4 a supprimé l'interface héritée qu'attend
-  // le `{ typescript: true }` de importX.typescript : on câble resolver-next.
+  // eslint-import-resolver-typescript v4 dropped the legacy interface that
+  // importX.typescript's `{ typescript: true }` expects, so wire resolver-next.
   {
     settings: {
       'import-x/resolver-next': [createTypeScriptImportResolver({ alwaysTryTypes: true, project: 'tsconfig.json' })],
@@ -103,7 +103,7 @@ export default defineConfig([
   classMemberOrder,
   configFiles,
 
-  // Prettier en dernier : le formatage est vérifié par l'action prettier de
-  // `.concatenate/check.json`, pas par une règle de lint.
+  // Prettier last: formatting is checked by the prettier action in
+  // `.concatenate/check.yaml`, not by a lint rule.
   eslintConfigPrettier,
 ]);
