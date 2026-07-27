@@ -756,13 +756,17 @@ describe.concurrent('concatenate', () => {
       });
     });
 
+    // Also the guard on the lazily-imported zod: this is the only command whose failure
+    // path resolves `await import('zod')`, and a broken dynamic import fails silently.
     it('rejects an unsupported extension', async () => {
       await withTemporaryDirectory(async (directory) => {
         await writePackageJSON(directory);
 
-        const { exitCode } = await runCLI(['setup', 'toml'], { cwd: directory });
+        const { exitCode, stdout } = await runCLI(['setup', 'toml'], { cwd: directory });
 
-        expect(exitCode).not.toBe(0);
+        expect(exitCode).toBe(4);
+        expect(stdout).toContain('does not match the expected format');
+        expect(stdout).toContain('"yaml"');
       });
     });
   });
