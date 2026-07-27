@@ -1,5 +1,5 @@
 import { program } from 'commander';
-import { readPackageSync } from 'read-pkg';
+import { readFileSync } from 'node:fs';
 import { ZodError } from 'zod';
 import { CommandRunner } from './controllers/command-runner.js';
 import { SetupRunner } from './controllers/setup-runner.js';
@@ -7,7 +7,14 @@ import { getConfigFile } from './helpers/config-selector.js';
 import { Logger } from './helpers/logger.js';
 import type { SetupFileExtensionType } from './models/command-model.js';
 
-const packageJSON = await readPackageSync();
+// Résolu depuis l'emplacement du module, pas depuis process.cwd() : sinon `--version`
+// et `--help` rapportent le package du projet qui invoque concatenate. src/ et dist/
+// sont tous deux à un niveau sous la racine, donc le chemin vaut en dev comme en build.
+const packageJSON = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), { encoding: 'utf8' })) as {
+  description?: string;
+  name: string;
+  version: string;
+};
 
 program
   .name(packageJSON.name)
