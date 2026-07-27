@@ -42,11 +42,16 @@ two disagree, komity wins. `npx komity types` prints the live list.
 [log] <changelog entry>
 ```
 
-**Scope is the GitHub issue number**, bare digits, and it must be the issue the work
-actually closes or advances. This is the only thing linking a commit to its issue:
-komity's changelog generator reads it back out with `/\((\w+-\d+|\d+)?\)/` and renders
-it as `[3]`. A commit with no scope is one nothing can trace. Omit it only for work
-that has no issue.
+**Scope is the GitHub issue reference, written `#<number>`** — `refactor(#4):` — and it
+must be the issue the work actually closes or advances. The `#` is what GitHub's issue
+tracker matches on, so the commit shows up against the issue automatically. A commit
+with no scope is one nothing can trace. Omit it only for work that has no issue.
+
+> Known trade-off: komity's own changelog generator reads the scope back with
+> `/\((\w+-\d+|\d+)?\)/`, which does not match a `#`. `refactor(#4)` yields no task tag
+> in the generated changelog where `refactor(4)` would yield `[4]`. GitHub linkage wins —
+> it is the one people follow — and the changelog entry still renders, just without the
+> tag.
 
 `<subject>` is capped at **100 characters** — komity rejects the commit, it does not
 truncate. `<body>` explains what and why in a few sentences.
@@ -84,7 +89,7 @@ git add <files>
 npx komity commit --input - <<'JSON'
 {
   "type": "refactor",
-  "scope": "3",
+  "scope": "#3",
   "subject": "move config locating, reading and parsing into a helper",
   "body": "Why it moved, and what it unblocks.",
   "changelog": "Optional single line, omitted for internal work."

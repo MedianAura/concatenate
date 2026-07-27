@@ -15,8 +15,9 @@ Create a git commit following the project's commit message format specified in I
    - Run `npm run test` to ensure the unit and e2e suites pass
 
 3. **Identify the issue**: Find the GitHub issue this commit closes or advances —
-   `gh issue list` if it is not already known. Its number is the commit scope. Work with
-   no issue behind it is committed without a scope, but that is the exception.
+   `gh issue list` if it is not already known. The scope is that issue written `#<number>`
+   — `"scope": "#4"` — so GitHub links the commit to it. Work with no issue behind it is
+   committed without a scope, but that is the exception.
 
 4. **Draft the payload**: komity owns the format; do not hand-write the message. The
    type list, the scope rule, the 100-character subject cap and the `[log]` line are all
@@ -44,7 +45,7 @@ Create a git commit following the project's commit message format specified in I
      npx komity commit --input - <<'JSON'
      {
        "type": "refactor",
-       "scope": "3",
+       "scope": "#3",
        "subject": "move config locating, reading and parsing into a helper",
        "body": "Why it moved, and what it unblocks."
      }
