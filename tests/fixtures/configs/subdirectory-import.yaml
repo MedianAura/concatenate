@@ -1,0 +1,5 @@
+type: parallel
+actions:
+  - id: shared
+    label: Shared
+    import: ./shared/lint.yaml

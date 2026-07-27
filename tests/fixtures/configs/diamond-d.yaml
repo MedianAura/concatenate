@@ -1,0 +1,5 @@
+type: series
+actions:
+  - id: shared-leaf
+    label: Shared leaf
+    command: echo d

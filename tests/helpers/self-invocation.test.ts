@@ -38,23 +38,23 @@ describe('isSelfInvocation', () => {
 
 describe('assertNoSelfInvocation', () => {
   const clean = [
-    { command: 'eslint .', labelPath: ['Lint'] },
-    { command: 'tsc --noEmit', labelPath: ['Type check'] },
+    { command: 'eslint .', labelPath: ['Lint'], file: '.concatenate/check.yaml' },
+    { command: 'tsc --noEmit', labelPath: ['Type check'], file: '.concatenate/check.yaml' },
   ];
 
   it('passes a config with no self-invocation', () => {
-    expect(() => assertNoSelfInvocation(clean, '.concatenate/check.yaml')).not.toThrow();
+    expect(() => assertNoSelfInvocation(clean)).not.toThrow();
   });
 
   it('passes an empty action list', () => {
-    expect(() => assertNoSelfInvocation([], '.concatenate/check.yaml')).not.toThrow();
+    expect(() => assertNoSelfInvocation([])).not.toThrow();
   });
 
   it('throws a SelfInvocationError naming the label, the file and the command', () => {
-    const actions = [...clean, { command: 'concatenate lint', labelPath: ['Checking with TSC', 'Run Linters'] }];
+    const actions = [...clean, { command: 'concatenate lint', labelPath: ['Checking with TSC', 'Run Linters'], file: '.concatenate/check.yaml' }];
 
     try {
-      assertNoSelfInvocation(actions, '.concatenate/check.yaml');
+      assertNoSelfInvocation(actions);
       expect.unreachable('expected assertNoSelfInvocation to throw');
     } catch (error) {
       expect(error).toBeInstanceOf(SelfInvocationError);
@@ -67,20 +67,28 @@ describe('assertNoSelfInvocation', () => {
 
   // Windows separators would otherwise leak into the message, making it unassertable.
   it('normalises the reported path to forward slashes', () => {
-    expect(() => assertNoSelfInvocation([{ command: 'concatenate check', labelPath: ['A'] }], String.raw`.concatenate\check.yaml`)).toThrow('.concatenate/check.yaml');
+    expect(() => assertNoSelfInvocation([{ command: 'concatenate check', labelPath: ['A'], file: String.raw`.concatenate\check.yaml` }])).toThrow('.concatenate/check.yaml');
+  });
+
+  // Per-leaf files are the point once imports exist: the offending action is usually not
+  // in the file the user ran.
+  it('reports the file the offending leaf came from, not the first one', () => {
+    expect(() =>
+      assertNoSelfInvocation([
+        { command: 'eslint .', labelPath: ['Lint'], file: '.concatenate/check.yaml' },
+        { command: 'concatenate check', labelPath: ['Shared', 'Loop'], file: '.concatenate/shared/lint.yaml' },
+      ]),
+    ).toThrow('.concatenate/shared/lint.yaml');
   });
 
   // Reported before anything spawns, so the first offender is the whole message: there
   // is no partial run to reconcile it against.
   it('reports the first offender', () => {
     expect(() =>
-      assertNoSelfInvocation(
-        [
-          { command: 'npx concatenate a', labelPath: ['First'] },
-          { command: 'concatenate b', labelPath: ['Second'] },
-        ],
-        'c.yaml',
-      ),
+      assertNoSelfInvocation([
+        { command: 'npx concatenate a', labelPath: ['First'], file: 'c.yaml' },
+        { command: 'concatenate b', labelPath: ['Second'], file: 'c.yaml' },
+      ]),
     ).toThrow('command: npx concatenate a');
   });
 });

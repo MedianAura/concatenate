@@ -1,0 +1,4 @@
+type: series
+actions:
+  - label: Level 7
+    import: ./depth-8.yaml

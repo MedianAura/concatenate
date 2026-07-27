@@ -1,0 +1,8 @@
+type: parallel
+actions:
+  - id: b
+    label: Branch B
+    import: ./diamond-b.yaml
+  - id: c
+    label: Branch C
+    import: ./diamond-c.yaml

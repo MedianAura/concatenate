@@ -1,14 +1,16 @@
-import type { ActionModelSchema } from '../models/action-model.js';
 import { Logger } from './logger.js';
 
 /**
  * Narrows a config's actions to the ids the user asked for, in configuration order.
  *
+ * Generic over the node shape rather than tied to `ActionModelSchema`: the same rule now
+ * runs against resolved tree nodes, which carry more than a leaf does.
+ *
  * Still flat: ids form one namespace and duplicates anywhere are rejected. Tree-aware
  * selection replaces this, which is why it is a free function -- there is no state here,
  * and the class it lived on only made it harder to test.
  */
-export function filterActionsByIds(actions: ActionModelSchema[], requestedIds: string[]): ActionModelSchema[] {
+export function filterActionsByIds<T extends { id?: string; label: string }>(actions: T[], requestedIds: string[]): T[] {
   // Check for duplicate IDs in configuration
   const idCounts = new Map<string, number>();
   for (const action of actions) {

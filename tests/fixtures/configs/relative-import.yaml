@@ -1,0 +1,5 @@
+type: series
+actions:
+  - id: imported
+    label: Imported
+    import: ./root-leaf.yaml

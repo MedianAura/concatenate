@@ -1,0 +1,8 @@
+type: parallel
+actions:
+  - id: eslint
+    label: ESLint
+    command: eslint .
+  - id: prettier
+    label: Prettier
+    command: prettier --check .

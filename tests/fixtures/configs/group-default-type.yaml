@@ -1,0 +1,8 @@
+type: parallel
+actions:
+  - id: grouped
+    label: Grouped
+    children:
+      - id: inner
+        label: Inner
+        command: echo inner

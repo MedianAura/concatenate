@@ -1,0 +1,5 @@
+type: series
+actions:
+  - id: lint
+    label: Lint
+    command: eslint .

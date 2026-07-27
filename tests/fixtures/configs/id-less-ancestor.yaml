@@ -1,0 +1,15 @@
+type: series
+actions:
+  - label: No id group
+    children:
+      - id: has-id
+        label: Has an id
+        command: echo x
+  - id: outer
+    label: Outer
+    children:
+      - id: inner
+        label: Inner
+        command: echo y
+      - label: Anonymous
+        command: echo z

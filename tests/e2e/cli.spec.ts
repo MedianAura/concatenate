@@ -166,8 +166,10 @@ describe.concurrent('concatenate', () => {
         const { exitCode, stdout } = await runCLI(['default'], { cwd: directory });
 
         expect(exitCode).toBe(4);
-        expect(stdout).toContain('actions[0].command');
-        expect(stdout).toContain('expected string, received undefined');
+        expect(stdout).toContain('actions[0]');
+        // The union cannot say which member was meant, so the schema supplies the
+        // message instead of leaving zod's bare "Invalid input".
+        expect(stdout).toContain('exactly one of: command');
         // The old lead line blamed the file extension no matter what actually failed.
         expect(stdout).not.toContain('extension provided');
       });
@@ -317,6 +319,160 @@ describe.concurrent('concatenate', () => {
 
       expect(exitCode).not.toBe(0);
       expect(stdout).toContain('not a TTY');
+    });
+  });
+
+  describe('nested configurations', () => {
+    it('runs a children group as native subtasks', async () => {
+      await withProject(
+        {
+          files: { 'a.mjs': 'console.log("inner ran");', 'b.mjs': 'console.log("sibling ran");' },
+          configs: {
+            'default.yaml': `type: series\nactions:\n${nodeAction('sibling', 'Sibling', 'b.mjs')}${groupAction('tsc', 'Checking with TSC', nodeAction('eslint', 'Checking with ESLint', 'a.mjs', 6))}`,
+          },
+        },
+        async (directory) => {
+          const { exitCode, stdout } = await runCLI(['default'], { cwd: directory });
+
+          expect(exitCode).toBe(0);
+          expect(stdout).toContain('inner ran');
+          expect(stdout).toContain('sibling ran');
+          // Breadcrumbs identify a nested action unambiguously in the report.
+          expect(stdout).toContain('Checking with TSC > Checking with ESLint');
+        },
+      );
+    });
+
+    it('runs a sibling import', async () => {
+      await withProject(
+        {
+          files: { 'a.mjs': 'console.log("imported ran");', 'b.mjs': 'console.log("local ran");' },
+          configs: {
+            'default.yaml': `type: series\nactions:\n${nodeAction('local', 'Local', 'b.mjs')}  - id: shared\n    label: Shared\n    import: ./other.yaml\n`,
+            'other.yaml': `type: series\nactions:\n${nodeAction('eslint', 'Imported action', 'a.mjs')}`,
+          },
+        },
+        async (directory) => {
+          const { exitCode, stdout } = await runCLI(['default'], { cwd: directory });
+
+          expect(exitCode).toBe(0);
+          expect(stdout).toContain('local ran');
+          expect(stdout).toContain('imported ran');
+          expect(stdout).toContain('Shared > Imported action');
+        },
+      );
+    });
+
+    it('resolves an import from a subdirectory relative to the importing file', async () => {
+      await withProject(
+        {
+          files: { 'a.mjs': 'console.log("subdir import ran");' },
+          configs: {
+            'default.yaml': `type: series\nactions:\n  - id: shared\n    label: Shared\n    import: ./shared/lint.yaml\n`,
+            'shared/lint.yaml': `type: series\nactions:\n${nodeAction('eslint', 'Nested lint', 'a.mjs')}`,
+          },
+        },
+        async (directory) => {
+          const { exitCode, stdout } = await runCLI(['default'], { cwd: directory });
+
+          expect(exitCode).toBe(0);
+          expect(stdout).toContain('subdir import ran');
+        },
+      );
+    });
+
+    it('fails on an import cycle instead of recursing', async () => {
+      await withProject(
+        {
+          configs: {
+            'default.yaml': `type: series\nactions:\n  - label: To other\n    import: ./other.yaml\n`,
+            'other.yaml': `type: series\nactions:\n  - label: Back\n    import: ./default.yaml\n`,
+          },
+        },
+        async (directory) => {
+          const { exitCode, stdout } = await runCLI(['default'], { cwd: directory });
+
+          expect(exitCode).not.toBe(0);
+          expect(stdout).toContain('Import cycle detected');
+        },
+      );
+    });
+
+    it('fails on an import without an extension', async () => {
+      await withProject(
+        {
+          configs: { 'default.yaml': `type: series\nactions:\n  - label: Bad\n    import: ./other\n` },
+        },
+        async (directory) => {
+          const { exitCode, stdout } = await runCLI(['default'], { cwd: directory });
+
+          expect(exitCode).not.toBe(0);
+          expect(stdout).toContain('must include a file extension');
+        },
+      );
+    });
+
+    // Per-node mapping of the root rule: the series group stops at its own first failure
+    // while its parallel sibling keeps going.
+    it('isolates failure inside a series group nested in a parallel root', async () => {
+      await withProject(
+        {
+          files: {
+            'boom.mjs': 'process.exit(3);',
+            'after.mjs': 'console.log("ran after the failure");',
+            'sibling.mjs': 'console.log("sibling kept running");',
+          },
+          configs: {
+            'default.yaml': `type: parallel\nactions:\n${nodeAction('sibling', 'Sibling', 'sibling.mjs')}${groupAction(
+              'seq',
+              'Sequential group',
+              `${nodeAction('boom', 'Failing action', 'boom.mjs', 6)}${nodeAction('after', 'Later action', 'after.mjs', 6)}`,
+              { type: 'series' },
+            )}`,
+          },
+        },
+        async (directory) => {
+          const { exitCode, stdout } = await runCLI(['default'], { cwd: directory });
+
+          expect(exitCode).not.toBe(0);
+          expect(stdout).not.toContain('ran after the failure');
+          expect(stdout).toContain('sibling kept running');
+        },
+      );
+    });
+
+    // The scan walks the resolved tree, so `import` is not a way around the #7 guard.
+    it('refuses a self-invocation that lives in an imported file', async () => {
+      await withProject(
+        {
+          configs: {
+            'default.yaml': `type: series\nactions:\n  - label: Shared\n    import: ./shared/lint.yaml\n`,
+            'shared/lint.yaml': `type: series\nactions:\n  - label: Loop\n    command: concatenate default\n`,
+          },
+        },
+        async (directory) => {
+          const { exitCode, stdout } = await runCLI(['default'], { cwd: directory });
+
+          expect(exitCode).toBe(5);
+          expect(stdout).toContain('Shared > Loop');
+          // The file named is the one the offending action is actually written in.
+          expect(stdout).toContain('.concatenate/shared/lint.yaml');
+        },
+      );
+    });
+
+    it('rejects an unknown key in an action', async () => {
+      await withProject(
+        {
+          configs: { 'default.yaml': `type: series\nactions:\n  - label: Typo\n    commmand: eslint .\n` },
+        },
+        async (directory) => {
+          const { exitCode, stdout } = await runCLI(['default'], { cwd: directory });
+
+          expect(exitCode).toBe(4);
+          expect(stdout).toContain('actions[0]');
+        },
+      );
     });
   });
 

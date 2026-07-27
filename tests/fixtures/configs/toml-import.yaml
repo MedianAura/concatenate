@@ -1,0 +1,4 @@
+type: series
+actions:
+  - label: Toml
+    import: ./unsupported.toml

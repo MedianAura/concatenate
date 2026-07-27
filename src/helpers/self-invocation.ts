@@ -15,12 +15,13 @@ const PACKAGE_RUNNERS = new Set(['bun', 'bunx', 'npm', 'npx', 'pnpm', 'pnpx', 'y
 
 export interface ScannedAction {
   command: string;
-  /**
-   * Ancestor labels ending with the action's own. A single entry today; nesting fills
-   * the rest in, which is why the message joins with ` > ` for a case that cannot yet
-   * happen.
-   */
+  /** Ancestor labels ending with the action's own, joined with ` > ` in the message. */
   labelPath: string[];
+  /**
+   * Per-leaf rather than one file for the whole scan: once a config can import another,
+   * the offending action is frequently not in the file the user ran.
+   */
+  file: string;
 }
 
 /**
@@ -50,14 +51,14 @@ export function isSelfInvocation(command: string): boolean {
  * have launched the other branches by the time the offending one ran, and the point is
  * that nothing starts.
  */
-export function assertNoSelfInvocation(actions: ScannedAction[], configFile: string): void {
+export function assertNoSelfInvocation(actions: ScannedAction[]): void {
   const offender = actions.find((action) => isSelfInvocation(action.command));
 
   if (offender === undefined) return;
 
   // Forward slashes on every platform: the path is read, not passed to a shell, and a
   // message that changes shape per-OS is one no test can assert on.
-  const location = configFile.replaceAll(path.sep, '/');
+  const location = offender.file.replaceAll(path.sep, '/');
 
   throw new SelfInvocationError(
     [

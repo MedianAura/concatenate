@@ -1,0 +1,4 @@
+type: series
+actions:
+  - label: Level 4
+    import: ./depth-5.yaml

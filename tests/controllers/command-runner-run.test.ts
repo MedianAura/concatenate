@@ -17,18 +17,10 @@ vi.mock('@/helpers/root-directory-path.js', () => ({
   getConcatenateDirectoryPath: (): string => '/projects/app/.concatenate',
 }));
 
-// `validateData` is the last private the tests drive directly, rather than through the
-// Listr run that would need a full subprocess mock. Locating, reading and parsing live
-// in helpers/config-file.ts and action filtering in helpers/action-filter.ts, both
-// tested there against exported functions with no class to construct.
-//
-// Deliberately not an intersection with CommandRunner: TypeScript reduces
-// `CommandRunner & { validateData... }` to `never`, because the member exists in both
-// constituents and is private in one. The cast below goes through `unknown` instead.
-interface Privates {
-  validateData(config: string): Promise<unknown>;
-}
-
+// Nothing private left to reach: locating, reading and parsing live in
+// helpers/config-file.ts, resolution in controllers/config-loader.ts and filtering in
+// helpers/action-filter.ts, each tested directly. What remains here is `run` itself,
+// driven through its public surface with execa mocked.
 const globbyMock = vi.mocked(globby);
 const execaMock = vi.mocked(execa);
 const readFileSyncMock = vi.mocked(fs.readFileSync);
@@ -39,32 +31,8 @@ function result(overrides: Partial<{ durationMs: number; exitCode: number; stder
 }
 
 describe('CommandRunner internals', () => {
-  let runner: Privates;
-
   beforeEach(() => {
-    runner = new CommandRunner() as unknown as Privates;
     vi.clearAllMocks();
-  });
-
-  describe('validateData', () => {
-    it('returns the parsed config', async () => {
-      globbyMock.mockResolvedValue(['/a/check.yaml']);
-      readFileSyncMock.mockReturnValue('type: series\nactions:\n  - label: Lint\n    command: eslint .\n' as never);
-
-      // The resolved path rides along with the data: the self-invocation message names
-      // the file the offending action came from.
-      await expect(runner.validateData('check')).resolves.toEqual({
-        configFile: '/a/check.yaml',
-        data: { type: 'series', actions: [{ label: 'Lint', command: 'eslint .' }] },
-      });
-    });
-
-    it('rejects a config that fails the schema', async () => {
-      globbyMock.mockResolvedValue(['/a/check.yaml']);
-      readFileSyncMock.mockReturnValue('type: sideways\nactions: []\n' as never);
-
-      await expect(runner.validateData('check')).rejects.toThrow();
-    });
   });
 
   describe('run', () => {

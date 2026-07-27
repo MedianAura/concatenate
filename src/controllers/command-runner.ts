@@ -1,14 +1,15 @@
 import chalk from 'chalk';
 import { execa, ExecaError, parseCommandString, type Result } from 'execa';
-import { Listr, parseTimer, PRESET_TIMER } from 'listr2';
+import { Listr, type ListrTask, parseTimer, PRESET_TIMER } from 'listr2';
 import path from 'node:path';
 import type { Readable } from 'node:stream';
 import { filterActionsByIds } from '../helpers/action-filter.js';
-import { findConfigFile, parseConfigData, readConfigFile } from '../helpers/config-file.js';
+import { findConfigFile } from '../helpers/config-file.js';
 import { Logger } from '../helpers/logger.js';
 import { getConcatenateDirectoryPath } from '../helpers/root-directory-path.js';
 import { assertNoSelfInvocation } from '../helpers/self-invocation.js';
-import { ConfigModel, type ConfigModelSchema } from '../models/config-model.js';
+import { type ResolvedNode, walkLeaves } from '../models/config-tree.js';
+import { loadFile } from './config-loader.js';
 
 interface ListrContextReport {
   title: string;
@@ -73,73 +74,47 @@ function printContext(context: ListrContext): void {
 
 export class CommandRunner {
   public async run(config: string, actionIds?: string[]): Promise<void> {
-    const { configFile, data } = await this.validateData(config);
+    const configFile = await findConfigFile(config);
+    const tree = loadFile(configFile);
 
     // Relative to the project root: findConfigFile returns an absolute path, and an
-    // absolute path in the message is noise the reader has to skip past to find the two
-    // segments that identify the file. Hoisted out of the call because
-    // `unicorn/max-nested-calls` caps the expression at three deep.
+    // absolute path in a message is noise the reader has to skip past to find the two
+    // segments that identify the file.
     const projectRoot = path.resolve(getConcatenateDirectoryPath(), '..');
 
-    // Before filtering, not after: an action the user did not select is still a config
-    // defect, and reporting it only when it happens to be selected makes the failure
-    // depend on the command line rather than on the file.
+    // Over the whole resolved tree, before filtering: an action the user did not select
+    // is still a config defect, and an imported file is scanned exactly like an inline
+    // one -- which is the only reason `import` is not a way around the guard.
     assertNoSelfInvocation(
-      data.actions.map((action) => ({ command: action.command, labelPath: [action.label] })),
-      path.relative(projectRoot, configFile),
+      [...walkLeaves(tree.nodes)].map((leaf) => ({
+        command: leaf.command,
+        labelPath: leaf.labelPath,
+        file: path.relative(projectRoot, leaf.file),
+      })),
     );
 
-    // Filter actions if IDs are provided
-    const actions = actionIds && actionIds.length > 0 ? filterActionsByIds(data.actions, actionIds) : data.actions;
+    // Still flat: root-level ids only. Tree-aware selection by dotted path is #9.
+    const nodes = actionIds && actionIds.length > 0 ? filterActionsByIds(tree.nodes, actionIds) : tree.nodes;
 
     // Read once, not per action: every action of a run sits at the same depth.
     const currentDepth = Number(process.env.CONCATENATE_DEPTH ?? '0') || 0;
 
     const globalContext = { reports: [] as ListrContextReport[] };
 
-    const tasks = new Listr<ListrContext>([], {
-      concurrent: data.type === 'parallel',
-      collectErrors: true,
-      exitOnError: data.type === 'series',
+    const tasks = new Listr<ListrContext>(this.buildTasks(nodes, currentDepth), {
+      concurrent: tree.type === 'parallel',
+      exitOnError: tree.type === 'series',
       rendererOptions: {
         showErrorMessage: false,
         // Live per-task duration. Checks are the kind of thing you watch, and knowing
         // which action is the slow one is most of why you would watch.
         timer: PRESET_TIMER,
       },
+      // Set once, at the root. Deliberately omitted from every `newListr` below:
+      // subtasks inherit the parent ctx, which is what makes the shared `reports` array
+      // work with no plumbing.
       ctx: globalContext,
     });
-
-    for (const action of actions) {
-      tasks.add([
-        {
-          title: action.label,
-          task: async (context): Promise<void> => {
-            try {
-              // execa 10 removed `execaCommand`: same shell-less splitting, in two steps.
-              const [file, ...commandArguments] = parseCommandString(action.command);
-              const status = await execa(file, commandArguments, {
-                cwd: path.resolve(getConcatenateDirectoryPath(), '..'),
-                stdio: 'pipe',
-                // Commands target the checked project's binaries (eslint, tsc, ...).
-                // Without this only the inherited PATH resolves them, which works under
-                // `pnpm run` but not from a global install of the CLI.
-                preferLocal: true,
-                // The marker the pre-scan cannot replace: it survives any amount of
-                // indirection, so `command: npm run check` where the script calls
-                // concatenate is caught by the child refusing to start.
-                env: { ...process.env, FORCE_COLOR: '1', CONCATENATE_ACTIVE: '1', CONCATENATE_DEPTH: String(currentDepth + 1) },
-              });
-
-              handleOutput(status, action.label, context);
-            } catch (error: unknown) {
-              handleOutput(error as ExecaError, action.label, context);
-              throw new Error(action.label, { cause: error });
-            }
-          },
-        },
-      ]);
-    }
 
     try {
       await tasks.run();
@@ -157,16 +132,57 @@ export class CommandRunner {
   }
 
   /**
-   * Returns the resolved path alongside the data: the self-invocation message names the
-   * file the offending action came from, and by the time `run()` has the data the path
-   * is otherwise gone.
+   * Per-node mapping of the rule that used to apply only at the root: a group's own
+   * `type` decides whether its children run concurrently and whether it stops at the
+   * first failure. The useful consequence is that a `series` group inside a `parallel`
+   * root stops at its first failure while its siblings keep running.
    */
-  private async validateData(config: string): Promise<{ configFile: string; data: ConfigModelSchema }> {
-    const configFile = await findConfigFile(config);
+  private buildTasks(nodes: ResolvedNode[], currentDepth: number): ListrTask<ListrContext>[] {
+    return nodes.map((node) => {
+      if (node.kind === 'group') {
+        return {
+          title: node.label,
+          task: (_context, task): Listr<ListrContext> =>
+            task.newListr(this.buildTasks(node.children, currentDepth), {
+              concurrent: node.type === 'parallel',
+              exitOnError: node.type === 'series',
+              // Subtasks stay expanded: collapsed, a failing leaf is reported under its
+              // group's title and the run gives no way to tell which child failed.
+              rendererOptions: { collapseSubtasks: false, showErrorMessage: false },
+            }),
+        };
+      }
 
-    const dataString = readConfigFile(configFile);
-    const data = parseConfigData(configFile, dataString);
+      // Breadcrumbs, so a report line identifies a nested action unambiguously. ASCII
+      // `>` rather than the U+203A chevron: these land in CI logs and Windows consoles.
+      const title = node.labelPath.join(' > ');
 
-    return { configFile, data: ConfigModel.parse(data) };
+      return {
+        title: node.label,
+        task: async (context): Promise<void> => {
+          try {
+            // execa 10 removed `execaCommand`: same shell-less splitting, in two steps.
+            const [file, ...commandArguments] = parseCommandString(node.command);
+            const status = await execa(file, commandArguments, {
+              cwd: path.resolve(getConcatenateDirectoryPath(), '..'),
+              stdio: 'pipe',
+              // Commands target the checked project's binaries (eslint, tsc, ...).
+              // Without this only the inherited PATH resolves them, which works under
+              // `pnpm run` but not from a global install of the CLI.
+              preferLocal: true,
+              // The marker the pre-scan cannot replace: it survives any amount of
+              // indirection, so `command: npm run check` where the script calls
+              // concatenate is caught by the child refusing to start.
+              env: { ...process.env, FORCE_COLOR: '1', CONCATENATE_ACTIVE: '1', CONCATENATE_DEPTH: String(currentDepth + 1) },
+            });
+
+            handleOutput(status, title, context);
+          } catch (error: unknown) {
+            handleOutput(error as ExecaError, title, context);
+            throw new Error(title, { cause: error });
+          }
+        },
+      };
+    });
   }
 }

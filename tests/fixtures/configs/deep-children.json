@@ -1,0 +1,159 @@
+{
+  "type": "series",
+  "actions": [
+    {
+      "label": "Level 0",
+      "children": [
+        {
+          "label": "Level 1",
+          "children": [
+            {
+              "label": "Level 2",
+              "children": [
+                {
+                  "label": "Level 3",
+                  "children": [
+                    {
+                      "label": "Level 4",
+                      "children": [
+                        {
+                          "label": "Level 5",
+                          "children": [
+                            {
+                              "label": "Level 6",
+                              "children": [
+                                {
+                                  "label": "Level 7",
+                                  "children": [
+                                    {
+                                      "label": "Level 8",
+                                      "children": [
+                                        {
+                                          "label": "Level 9",
+                                          "children": [
+                                            {
+                                              "label": "Level 10",
+                                              "children": [
+                                                {
+                                                  "label": "Level 11",
+                                                  "children": [
+                                                    {
+                                                      "label": "Level 12",
+                                                      "children": [
+                                                        {
+                                                          "label": "Level 13",
+                                                          "children": [
+                                                            {
+                                                              "label": "Level 14",
+                                                              "children": [
+                                                                {
+                                                                  "label": "Level 15",
+                                                                  "children": [
+                                                                    {
+                                                                      "label": "Level 16",
+                                                                      "children": [
+                                                                        {
+                                                                          "label": "Level 17",
+                                                                          "children": [
+                                                                            {
+                                                                              "label": "Level 18",
+                                                                              "children": [
+                                                                                {
+                                                                                  "label": "Level 19",
+                                                                                  "children": [
+                                                                                    {
+                                                                                      "label": "Level 20",
+                                                                                      "children": [
+                                                                                        {
+                                                                                          "label": "Level 21",
+                                                                                          "children": [
+                                                                                            {
+                                                                                              "label": "Level 22",
+                                                                                              "children": [
+                                                                                                {
+                                                                                                  "label": "Level 23",
+                                                                                                  "children": [
+                                                                                                    {
+                                                                                                      "label": "Level 24",
+                                                                                                      "children": [
+                                                                                                        {
+                                                                                                          "label": "Level 25",
+                                                                                                          "children": [
+                                                                                                            {
+                                                                                                              "label": "Level 26",
+                                                                                                              "children": [
+                                                                                                                {
+                                                                                                                  "label": "Level 27",
+                                                                                                                  "children": [
+                                                                                                                    {
+                                                                                                                      "label": "Level 28",
+                                                                                                                      "children": [
+                                                                                                                        {
+                                                                                                                          "label": "Level 29",
+                                                                                                                          "children": [
+                                                                                                                            {
+                                                                                                                              "label": "Leaf",
+                                                                                                                              "command": "echo deep"
+                                                                                                                            }
+                                                                                                                          ]
+                                                                                                                        }
+                                                                                                                      ]
+                                                                                                                    }
+                                                                                                                  ]
+                                                                                                                }
+                                                                                                              ]
+                                                                                                            }
+                                                                                                          ]
+                                                                                                        }
+                                                                                                      ]
+                                                                                                    }
+                                                                                                  ]
+                                                                                                }
+                                                                                              ]
+                                                                                            }
+                                                                                          ]
+                                                                                        }
+                                                                                      ]
+                                                                                    }
+                                                                                  ]
+                                                                                }
+                                                                              ]
+                                                                            }
+                                                                          ]
+                                                                        }
+                                                                      ]
+                                                                    }
+                                                                  ]
+                                                                }
+                                                              ]
+                                                            }
+                                                          ]
+                                                        }
+                                                      ]
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+type: series
+actions:
+  - label: To B
+    import: ./cycle-b.yaml
