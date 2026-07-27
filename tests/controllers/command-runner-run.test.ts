@@ -17,16 +17,15 @@ vi.mock('@/helpers/root-directory-path.js', () => ({
   getConcatenateDirectoryPath: (): string => '/projects/app/.concatenate',
 }));
 
-// `validateData` and `filterActionsByIds` are private; the tests drive them directly
-// rather than through the Listr run, which would need a full subprocess mock for every
-// case. Locating, reading and parsing moved to helpers/config-file.ts and are tested
-// there, without a class to construct -- filterActionsByIds follows in #4.
+// `validateData` is the last private the tests drive directly, rather than through the
+// Listr run that would need a full subprocess mock. Locating, reading and parsing live
+// in helpers/config-file.ts and action filtering in helpers/action-filter.ts, both
+// tested there against exported functions with no class to construct.
 //
 // Deliberately not an intersection with CommandRunner: TypeScript reduces
-// `CommandRunner & { getConfigFile... }` to `never`, because the member exists in both
+// `CommandRunner & { validateData... }` to `never`, because the member exists in both
 // constituents and is private in one. The cast below goes through `unknown` instead.
 interface Privates {
-  filterActionsByIds(actions: unknown[], requestedIds: string[]): unknown;
   validateData(config: string): Promise<unknown>;
 }
 
@@ -45,19 +44,6 @@ describe('CommandRunner internals', () => {
   beforeEach(() => {
     runner = new CommandRunner() as unknown as Privates;
     vi.clearAllMocks();
-  });
-
-  describe('filterActionsByIds edge cases', () => {
-    // The `|| '(none ...)'` fallback: every action lacks an id, so the "available ids"
-    // list would otherwise be an empty string in the error message.
-    it('says so when no action defines an id at all', () => {
-      const actions = [
-        { label: 'A', command: 'a' },
-        { label: 'B', command: 'b' },
-      ];
-
-      expect(() => runner.filterActionsByIds(actions, ['x'])).toThrow('none - no actions have IDs defined');
-    });
   });
 
   describe('validateData', () => {

@@ -1,38 +1,30 @@
-import { CommandRunner } from '@/controllers/command-runner.js';
+import { filterActionsByIds } from '@/helpers/action-filter.js';
 import { Logger } from '@/helpers/logger.js';
 import type { ActionModelSchema } from '@/models/action-model.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Type to access private methods for testing
-type CommandRunnerWithPrivates = CommandRunner & {
-  filterActionsByIds(actions: ActionModelSchema[], requestedIds: string[]): ActionModelSchema[];
-};
-
-// Mock dependencies
-vi.mock('../../src/helpers/logger.js', () => ({
-  Logger: {
-    warn: vi.fn(),
-    skipLine: vi.fn(),
-    clear: vi.fn(),
-    title: vi.fn(),
-    error: vi.fn(),
-  },
-}));
-
-vi.mock('globby');
-vi.mock('node:fs');
-vi.mock('execa');
-
-describe('CommandRunner - filterActionsByIds', () => {
-  let commandRunner: CommandRunnerWithPrivates;
-
+// No vi.mock and no class: the function is pure apart from the two Logger calls, and
+// those are reachable with a spy. The mocks this file used to carry -- globby, node:fs,
+// execa -- existed only to make CommandRunner constructible, never to shape a result.
+describe('filterActionsByIds', () => {
   beforeEach(() => {
-    commandRunner = new CommandRunner() as CommandRunnerWithPrivates;
-    vi.clearAllMocks();
+    vi.spyOn(Logger, 'warn').mockImplementation(() => {});
+    vi.spyOn(Logger, 'skipLine').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
+  });
+
+  // Migrated from the CommandRunner suite: the `|| '(none ...)'` fallback, where every
+  // action lacks an id so the "available ids" list would otherwise be an empty string.
+  it('says so when no action defines an id at all', () => {
+    const actions: ActionModelSchema[] = [
+      { label: 'A', command: 'a' },
+      { label: 'B', command: 'b' },
+    ];
+
+    expect(() => filterActionsByIds(actions, ['x'])).toThrow('none - no actions have IDs defined');
   });
 
   describe('Basic filtering', () => {
@@ -43,7 +35,7 @@ describe('CommandRunner - filterActionsByIds', () => {
         { id: 'tsc', label: 'TypeScript Check', command: 'tsc' },
       ];
 
-      const filtered = commandRunner.filterActionsByIds(actions, ['eslint']);
+      const filtered = filterActionsByIds(actions, ['eslint']);
 
       expect(filtered).toHaveLength(1);
       expect(filtered[0].id).toBe('eslint');
@@ -56,7 +48,7 @@ describe('CommandRunner - filterActionsByIds', () => {
         { id: 'tsc', label: 'TypeScript Check', command: 'tsc' },
       ];
 
-      const filtered = commandRunner.filterActionsByIds(actions, ['eslint', 'tsc']);
+      const filtered = filterActionsByIds(actions, ['eslint', 'tsc']);
 
       expect(filtered).toHaveLength(2);
       expect(filtered[0].id).toBe('eslint');
@@ -71,7 +63,7 @@ describe('CommandRunner - filterActionsByIds', () => {
       ];
 
       // Request in different order
-      const filtered = commandRunner.filterActionsByIds(actions, ['tsc', 'prettier']);
+      const filtered = filterActionsByIds(actions, ['tsc', 'prettier']);
 
       // Should preserve config file order (prettier, tsc), not request order (tsc, prettier)
       expect(filtered).toHaveLength(2);
@@ -87,7 +79,7 @@ describe('CommandRunner - filterActionsByIds', () => {
 
       // This will throw error for missing IDs, but test the filter logic with a valid case
       expect(() => {
-        commandRunner.filterActionsByIds(actions, ['nonexistent']);
+        filterActionsByIds(actions, ['nonexistent']);
       }).toThrow('The following action IDs were not found');
     });
   });
@@ -100,7 +92,7 @@ describe('CommandRunner - filterActionsByIds', () => {
       ];
 
       expect(() => {
-        commandRunner.filterActionsByIds(actions, ['eslint']);
+        filterActionsByIds(actions, ['eslint']);
       }).toThrow('Duplicate action IDs found in configuration: eslint');
     });
 
@@ -113,7 +105,7 @@ describe('CommandRunner - filterActionsByIds', () => {
       ];
 
       expect(() => {
-        commandRunner.filterActionsByIds(actions, ['eslint', 'prettier']);
+        filterActionsByIds(actions, ['eslint', 'prettier']);
       }).toThrow('Duplicate action IDs found in configuration');
       expect((Logger.warn as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0);
     });
@@ -125,7 +117,7 @@ describe('CommandRunner - filterActionsByIds', () => {
       ];
 
       expect(() => {
-        commandRunner.filterActionsByIds(actions, ['nonexistent']);
+        filterActionsByIds(actions, ['nonexistent']);
       }).toThrow('Duplicate action IDs found in configuration');
     });
   });
@@ -138,7 +130,7 @@ describe('CommandRunner - filterActionsByIds', () => {
       ];
 
       expect(() => {
-        commandRunner.filterActionsByIds(actions, ['nonexistent']);
+        filterActionsByIds(actions, ['nonexistent']);
       }).toThrow('The following action IDs were not found: nonexistent');
     });
 
@@ -149,7 +141,7 @@ describe('CommandRunner - filterActionsByIds', () => {
       ];
 
       expect(() => {
-        commandRunner.filterActionsByIds(actions, ['invalid']);
+        filterActionsByIds(actions, ['invalid']);
       }).toThrow(/Available IDs: eslint, prettier/);
     });
 
@@ -157,7 +149,7 @@ describe('CommandRunner - filterActionsByIds', () => {
       const actions: ActionModelSchema[] = [{ id: 'eslint', label: 'ESLint Check', command: 'eslint .' }];
 
       expect(() => {
-        commandRunner.filterActionsByIds(actions, ['missing1', 'missing2']);
+        filterActionsByIds(actions, ['missing1', 'missing2']);
       }).toThrow('The following action IDs were not found: missing1, missing2');
     });
 
@@ -168,7 +160,7 @@ describe('CommandRunner - filterActionsByIds', () => {
       ];
 
       expect(() => {
-        commandRunner.filterActionsByIds(actions, ['eslint']);
+        filterActionsByIds(actions, ['eslint']);
       }).toThrow(/Available IDs: \(none - no actions have IDs defined\)/);
     });
   });
@@ -181,7 +173,7 @@ describe('CommandRunner - filterActionsByIds', () => {
         { id: 'tsc', label: 'TypeScript Check', command: 'tsc' },
       ];
 
-      commandRunner.filterActionsByIds(actions, ['eslint', 'tsc']);
+      filterActionsByIds(actions, ['eslint', 'tsc']);
 
       expect(Logger.warn).toHaveBeenCalled();
       const warnCall = (Logger.warn as ReturnType<typeof vi.fn>).mock.calls[0][0];
@@ -195,7 +187,7 @@ describe('CommandRunner - filterActionsByIds', () => {
         { id: 'prettier', label: 'Prettier Check', command: 'prettier .' },
       ];
 
-      commandRunner.filterActionsByIds(actions, ['eslint']);
+      filterActionsByIds(actions, ['eslint']);
 
       expect(Logger.warn).not.toHaveBeenCalled();
     });
@@ -207,7 +199,7 @@ describe('CommandRunner - filterActionsByIds', () => {
         { id: 'tsc', label: 'TypeScript Check', command: 'tsc' },
       ];
 
-      const filtered = commandRunner.filterActionsByIds(actions, ['eslint', 'tsc']);
+      const filtered = filterActionsByIds(actions, ['eslint', 'tsc']);
 
       expect(filtered).toHaveLength(2);
       expect(filtered.every((action: ActionModelSchema) => action.id)).toBe(true);
@@ -220,7 +212,7 @@ describe('CommandRunner - filterActionsByIds', () => {
       const actions: ActionModelSchema[] = [{ id: 'eslint', label: 'ESLint Check', command: 'eslint .' }];
 
       // Empty array means no IDs requested, should return empty results
-      const filtered = commandRunner.filterActionsByIds(actions, []);
+      const filtered = filterActionsByIds(actions, []);
 
       expect(filtered).toHaveLength(0);
       expect(Logger.warn).not.toHaveBeenCalled();
@@ -230,7 +222,7 @@ describe('CommandRunner - filterActionsByIds', () => {
       const actions: ActionModelSchema[] = [];
 
       expect(() => {
-        commandRunner.filterActionsByIds(actions, ['any-id']);
+        filterActionsByIds(actions, ['any-id']);
       }).toThrow('The following action IDs were not found: any-id');
     });
 
@@ -238,14 +230,14 @@ describe('CommandRunner - filterActionsByIds', () => {
       const actions: ActionModelSchema[] = [{ label: 'Action 1', command: 'cmd1' } as ActionModelSchema, { label: 'Action 2', command: 'cmd2' } as ActionModelSchema];
 
       expect(() => {
-        commandRunner.filterActionsByIds(actions, ['any-id']);
+        filterActionsByIds(actions, ['any-id']);
       }).toThrow(/Available IDs: \(none - no actions have IDs defined\)/);
     });
 
     it('should handle single action', () => {
       const actions: ActionModelSchema[] = [{ id: 'only-one', label: 'Single Action', command: 'cmd' }];
 
-      const filtered = commandRunner.filterActionsByIds(actions, ['only-one']);
+      const filtered = filterActionsByIds(actions, ['only-one']);
 
       expect(filtered).toHaveLength(1);
       expect(filtered[0].id).toBe('only-one');
@@ -255,14 +247,14 @@ describe('CommandRunner - filterActionsByIds', () => {
       const actions: ActionModelSchema[] = [{ id: 'ESLint', label: 'ESLint Check', command: 'eslint .' }];
 
       expect(() => {
-        commandRunner.filterActionsByIds(actions, ['eslint']);
+        filterActionsByIds(actions, ['eslint']);
       }).toThrow('The following action IDs were not found: eslint');
     });
 
     it('should filter with spaces in command', () => {
       const actions: ActionModelSchema[] = [{ id: 'complex', label: 'Complex Command', command: 'eslint . --format pretty --fix' }];
 
-      const filtered = commandRunner.filterActionsByIds(actions, ['complex']);
+      const filtered = filterActionsByIds(actions, ['complex']);
 
       expect(filtered).toHaveLength(1);
       expect(filtered[0].command).toBe('eslint . --format pretty --fix');
@@ -275,7 +267,7 @@ describe('CommandRunner - filterActionsByIds', () => {
         { id: 'test:unit', label: 'Unit Tests', command: 'npm test' },
       ];
 
-      const filtered = commandRunner.filterActionsByIds(actions, ['eslint-check', 'prettier_format', 'test:unit']);
+      const filtered = filterActionsByIds(actions, ['eslint-check', 'prettier_format', 'test:unit']);
 
       expect(filtered).toHaveLength(3);
     });
@@ -286,7 +278,7 @@ describe('CommandRunner - filterActionsByIds', () => {
         { id: 'normal', label: 'Normal', command: 'cmd2' },
       ];
 
-      const filtered = commandRunner.filterActionsByIds(actions, ['  ']);
+      const filtered = filterActionsByIds(actions, ['  ']);
 
       expect(filtered).toHaveLength(1);
       expect(filtered[0].id).toBe('  ');
@@ -296,7 +288,7 @@ describe('CommandRunner - filterActionsByIds', () => {
       const longId = 'very-long-id-with-many-characters-that-describes-something-in-extreme-detail';
       const actions: ActionModelSchema[] = [{ id: longId, label: 'Long ID Action', command: 'cmd' }];
 
-      const filtered = commandRunner.filterActionsByIds(actions, [longId]);
+      const filtered = filterActionsByIds(actions, [longId]);
 
       expect(filtered).toHaveLength(1);
       expect(filtered[0].id).toBe(longId);
@@ -308,7 +300,7 @@ describe('CommandRunner - filterActionsByIds', () => {
         { id: '456', label: 'Another Numeric ID', command: 'cmd2' },
       ];
 
-      const filtered = commandRunner.filterActionsByIds(actions, ['123', '456']);
+      const filtered = filterActionsByIds(actions, ['123', '456']);
 
       expect(filtered).toHaveLength(2);
     });
@@ -323,7 +315,7 @@ describe('CommandRunner - filterActionsByIds', () => {
       ];
 
       // User wants to run just prettier and tsc (skip eslint)
-      const filtered = commandRunner.filterActionsByIds(actions, ['prettier', 'tsc']);
+      const filtered = filterActionsByIds(actions, ['prettier', 'tsc']);
 
       expect(filtered).toHaveLength(2);
       expect(filtered[0].id).toBe('prettier');
@@ -339,7 +331,7 @@ describe('CommandRunner - filterActionsByIds', () => {
       ];
 
       // User wants to run eslint and prettier only
-      const filtered = commandRunner.filterActionsByIds(actions, ['eslint', 'prettier']);
+      const filtered = filterActionsByIds(actions, ['eslint', 'prettier']);
 
       expect(filtered).toHaveLength(2);
       expect(filtered.map((a: ActionModelSchema) => a.id)).toEqual(['eslint', 'prettier']);
@@ -352,7 +344,7 @@ describe('CommandRunner - filterActionsByIds', () => {
         { id: 'test', label: 'Run Tests', command: 'npm test' },
       ];
 
-      commandRunner.filterActionsByIds(actions, ['linter', 'test']);
+      filterActionsByIds(actions, ['linter', 'test']);
 
       expect(Logger.warn).toHaveBeenCalled();
       expect(Logger.skipLine).toHaveBeenCalled();
@@ -369,7 +361,7 @@ describe('CommandRunner - filterActionsByIds', () => {
       // Filter to 10 specific actions
       const requestedIds = ['action-5', 'action-15', 'action-25', 'action-35', 'action-45', 'action-55', 'action-65', 'action-75', 'action-85', 'action-95'];
 
-      const filtered = commandRunner.filterActionsByIds(actions, requestedIds);
+      const filtered = filterActionsByIds(actions, requestedIds);
 
       expect(filtered).toHaveLength(10);
       expect(filtered.map((a: ActionModelSchema) => a.id)).toEqual(requestedIds);
@@ -381,7 +373,7 @@ describe('CommandRunner - filterActionsByIds', () => {
         { id: 'build-action', label: 'Build Action', command: 'npm run build' },
       ];
 
-      const filtered = commandRunner.filterActionsByIds(actions, ['test-action']);
+      const filtered = filterActionsByIds(actions, ['test-action']);
 
       expect(filtered[0]).toEqual({
         id: 'test-action',
@@ -401,7 +393,7 @@ describe('CommandRunner - filterActionsByIds', () => {
       ];
 
       expect(() => {
-        commandRunner.filterActionsByIds(actions, ['duplicate']);
+        filterActionsByIds(actions, ['duplicate']);
       }).toThrow(/^Duplicate action IDs found in configuration: (duplicate, another-dup|another-dup, duplicate)\. Each action must have a unique ID\.$/);
     });
 
@@ -412,7 +404,7 @@ describe('CommandRunner - filterActionsByIds', () => {
       ];
 
       try {
-        commandRunner.filterActionsByIds(actions, ['missing-id']);
+        filterActionsByIds(actions, ['missing-id']);
       } catch (error) {
         expect((error as Error).message).toContain('The following action IDs were not found: missing-id');
         expect((error as Error).message).toContain('Available IDs: ');
@@ -428,7 +420,7 @@ describe('CommandRunner - filterActionsByIds', () => {
         { label: 'No ID 2', command: 'cmd3' } as ActionModelSchema,
       ];
 
-      commandRunner.filterActionsByIds(actions, ['with-id']);
+      filterActionsByIds(actions, ['with-id']);
 
       expect(Logger.warn).toHaveBeenCalledWith(expect.stringContaining('Some actions do not have IDs defined'));
       expect(Logger.warn).toHaveBeenCalledWith(expect.stringContaining('Actions without IDs: No ID 1, No ID 2'));
@@ -442,7 +434,7 @@ describe('CommandRunner - filterActionsByIds', () => {
         { id: 'action-2', label: 'Action 2', command: 'cmd2' },
       ];
 
-      const filtered = commandRunner.filterActionsByIds(actions, ['action-1']);
+      const filtered = filterActionsByIds(actions, ['action-1']);
 
       expect(Array.isArray(filtered)).toBe(true);
       expect(filtered[0]).toHaveProperty('id');
@@ -457,7 +449,7 @@ describe('CommandRunner - filterActionsByIds', () => {
       ];
 
       const originalLength = actions.length;
-      const filtered = commandRunner.filterActionsByIds(actions, ['action-1']);
+      const filtered = filterActionsByIds(actions, ['action-1']);
 
       expect(filtered).not.toBe(actions);
       expect(actions).toHaveLength(originalLength);
@@ -471,7 +463,7 @@ describe('CommandRunner - filterActionsByIds', () => {
       ];
 
       // Request in alphabetical order
-      const filtered = commandRunner.filterActionsByIds(actions, ['alpha', 'beta', 'zebra']);
+      const filtered = filterActionsByIds(actions, ['alpha', 'beta', 'zebra']);
 
       // Should return in config file order (zebra, alpha, beta)
       expect(filtered.map((a: ActionModelSchema) => a.id)).toEqual(['zebra', 'alpha', 'beta']);

@@ -3,11 +3,11 @@ import { execa, ExecaError, parseCommandString, type Result } from 'execa';
 import { Listr, parseTimer, PRESET_TIMER } from 'listr2';
 import path from 'node:path';
 import type { Readable } from 'node:stream';
+import { filterActionsByIds } from '../helpers/action-filter.js';
 import { findConfigFile, parseConfigData, readConfigFile } from '../helpers/config-file.js';
 import { Logger } from '../helpers/logger.js';
 import { getConcatenateDirectoryPath } from '../helpers/root-directory-path.js';
 import { assertNoSelfInvocation } from '../helpers/self-invocation.js';
-import type { ActionModelSchema } from '../models/action-model.js';
 import { ConfigModel, type ConfigModelSchema } from '../models/config-model.js';
 
 interface ListrContextReport {
@@ -75,22 +75,22 @@ export class CommandRunner {
   public async run(config: string, actionIds?: string[]): Promise<void> {
     const { configFile, data } = await this.validateData(config);
 
-    // Before filtering, not after: an action the user did not select is still a config
-    // defect, and reporting it only when it happens to be selected makes the failure
-    // depend on the command line rather than on the file.
     // Relative to the project root: findConfigFile returns an absolute path, and an
     // absolute path in the message is noise the reader has to skip past to find the two
     // segments that identify the file. Hoisted out of the call because
     // `unicorn/max-nested-calls` caps the expression at three deep.
     const projectRoot = path.resolve(getConcatenateDirectoryPath(), '..');
 
+    // Before filtering, not after: an action the user did not select is still a config
+    // defect, and reporting it only when it happens to be selected makes the failure
+    // depend on the command line rather than on the file.
     assertNoSelfInvocation(
       data.actions.map((action) => ({ command: action.command, labelPath: [action.label] })),
       path.relative(projectRoot, configFile),
     );
 
     // Filter actions if IDs are provided
-    const actions = actionIds && actionIds.length > 0 ? this.filterActionsByIds(data.actions, actionIds) : data.actions;
+    const actions = actionIds && actionIds.length > 0 ? filterActionsByIds(data.actions, actionIds) : data.actions;
 
     // Read once, not per action: every action of a run sits at the same depth.
     const currentDepth = Number(process.env.CONCATENATE_DEPTH ?? '0') || 0;
@@ -168,42 +168,5 @@ export class CommandRunner {
     const data = parseConfigData(configFile, dataString);
 
     return { configFile, data: ConfigModel.parse(data) };
-  }
-
-  protected filterActionsByIds(actions: ActionModelSchema[], requestedIds: string[]): ActionModelSchema[] {
-    // Check for duplicate IDs in configuration
-    const idCounts = new Map<string, number>();
-    for (const action of actions) {
-      if (action.id) {
-        idCounts.set(action.id, (idCounts.get(action.id) || 0) + 1);
-      }
-    }
-
-    const duplicateIds = [...idCounts].filter(([, count]) => count > 1).map(([id]) => id);
-
-    if (duplicateIds.length > 0) {
-      throw new Error(`Duplicate action IDs found in configuration: ${duplicateIds.join(', ')}. Each action must have a unique ID.`);
-    }
-
-    // Get actions with IDs and available IDs
-    const actionsWithIds = actions.filter((action) => action.id !== undefined);
-    const availableIds = new Set(actionsWithIds.map((action) => action.id!));
-
-    // Check if requested IDs exist
-    const missingIds = requestedIds.filter((id) => !availableIds.has(id));
-    if (missingIds.length > 0) {
-      const availableIdsList = [...availableIds].join(', ');
-      throw new Error(`The following action IDs were not found: ${missingIds.join(', ')}.\nAvailable IDs: ${availableIdsList || '(none - no actions have IDs defined)'}`);
-    }
-
-    // Warn about actions without IDs that will be excluded
-    const actionsWithoutIds = actions.filter((action) => action.id === undefined);
-    if (actionsWithoutIds.length > 0) {
-      Logger.warn(`Warning: Some actions do not have IDs defined and will be excluded.\nActions without IDs: ${actionsWithoutIds.map((a) => a.label).join(', ')}`);
-      Logger.skipLine();
-    }
-
-    // Filter to only requested IDs (preserving order from configuration)
-    return actions.filter((action) => action.id && requestedIds.includes(action.id));
   }
 }
