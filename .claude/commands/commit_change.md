@@ -10,85 +10,71 @@ Create a git commit following the project's commit message format specified in I
    - `git log -5 --oneline` to see recent commit messages
 
 2. **Quality Checks**: Before committing, verify code quality:
-   - Run `npm run check` to verify the codebase (formatting, linting, type-checking)
+   - Run `npm run check` to verify the codebase (it builds first, then formats, lints and type-checks)
    - If check fails, run `npm run fix` to automatically resolve issues
-   - Run `npm run build` to ensure all workspaces build successfully
-   - Run `npm run test` if applicable to ensure tests pass
+   - Run `npm run test` to ensure the unit and e2e suites pass
 
-3. **Draft Commit Message**: Analyze the changes and draft a commit message using this format:
+3. **Identify the issue**: Find the GitHub issue this commit closes or advances —
+   `gh issue list` if it is not already known. Its number is the commit scope. Work with
+   no issue behind it is committed without a scope, but that is the exception.
 
-   ```
-   <type>: <description>
+4. **Draft the payload**: komity owns the format; do not hand-write the message. The
+   type list, the scope rule, the 100-character subject cap and the `[log]` line are all
+   documented in INSTRUCTIONS.md — read it rather than reproducing the list here, because
+   a second copy is what let this file drift out of date. `npx komity types` prints the
+   live list if there is any doubt.
 
-   <body>
-   ```
+   **Body**: a few sentences on what the change does and why. Focus on purpose and
+   impact, not a restatement of the diff.
 
-   **Types**:
-   - `feat`: New end-user functionality or features
-   - `ui`: User interface changes (layout, styling, components)
-   - `ux`: User experience changes (interactions, flow improvements)
-   - `fix`: Bug fixes for end-user issues
-   - `maintenance`: Non-behavioral changes (scripts, configs, tooling)
-   - `dep`: Dependency updates (add, remove, update packages)
-   - `docs`: Documentation changes
-   - `refactor`: Code restructuring without behavior change
-   - `test`: Test-related changes
+   **Changelog**: include `changelog` only when the change is visible to a user. Omit it
+   for refactors, test changes and internal moves.
 
-   **Body**: 1-3 sentences describing what the changes do and why. Focus on the purpose and impact, not just what was changed.
-
-4. **IMPORTANT Restrictions**:
+5. **IMPORTANT Restrictions**:
    - DO NOT include AI attribution (no "🤖 Generated with Claude Code")
    - DO NOT include co-author tags (no "Co-Authored-By: Claude")
    - Keep the message concise and professional
    - Focus on the "why" rather than just the "what"
 
-5. **Stage and Commit**:
-     - Add relevant untracked files to the staging area with `git add`
-     - Write the commit message to `.git/COMMIT_EDITMSG`:
-       ```bash
-       printf "<type>: <description>\n\n<body>\n" > .git/COMMIT_EDITMSG
-       ```
-     - Create the commit using the message file:
-       ```bash
-       git commit -F .git/COMMIT_EDITMSG
-       ```
-     - Run `git status` after the commit to verify success
+6. **Stage and Commit**:
+   - Add the relevant files to the staging area with `git add`
+   - Print the assembled message first, without touching the repository:
 
-6. **Handle Pre-commit Hooks**: If the commit fails due to pre-commit hook changes:
+     ```bash
+     npx komity commit --input - <<'JSON'
+     {
+       "type": "refactor",
+       "scope": "3",
+       "subject": "move config locating, reading and parsing into a helper",
+       "body": "Why it moved, and what it unblocks."
+     }
+     JSON
+     ```
+
+   - Re-run the same command with `--commit` to create it
+   - Run `git status` after the commit to verify success
+
+   komity rejects the payload outright on an unknown type, an empty subject, a subject
+   over 100 characters, or a `changelog` containing a newline. It never truncates, so a
+   rejection means fixing the payload, not retrying.
+
+7. **Handle Pre-commit Hooks**: If the commit fails due to pre-commit hook changes:
    - Check authorship: `git log -1 --format='%an %ae'`
    - Check if pushed: `git status` should show "Your branch is ahead"
    - If both are true: amend the commit
    - Otherwise: create a NEW commit (never amend other developers' commits)
 
-7. **Commit Organization**: Group related changes into logical commits:
+8. **Commit Organization**: Group related changes into logical commits:
    - Single feature/fix: One commit with all related files
    - Multiple unrelated changes: Create separate commits for each logical change
    - Don't separate a feature from its tests
    - Don't split configuration changes that are related
 
-## Examples
-
-```
-feat: add user authentication flow
-
-Implemented JWT-based authentication with login/logout endpoints and middleware for protected routes.
-```
-
-```
-fix: resolve navigation routing issue
-
-Fixed a bug where navigation links were not updating the URL correctly in nested routes.
-```
-
-```
-maintenance: add test scripts to package.json
-
-Added npm scripts for running tests in different modes to improve developer workflow.
-```
-
 ## Notes
 
 - DO NOT push to remote unless explicitly requested
 - Avoid using `git commit -i` or other interactive flags
+- `komity commit` with no `--input` prompts interactively and requires a TTY; it is not
+  usable from an agent
 - If there are no changes, do not create an empty commit
 - Always verify that quality checks pass before committing

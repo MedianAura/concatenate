@@ -30,55 +30,70 @@ When exploring or searching, avoid these directories (they're build artifacts or
 
 #### Commit Message Format
 
-Refer to the type listed below (DO NOT include AI attribution or co-author tags):
+Commits are written by [komity](https://github.com/MedianAura/komity), not by hand.
+It owns the format, so this section describes it rather than defining it — when the
+two disagree, komity wins. `npx komity types` prints the live list.
 
 ```
-<type>: <description>
+<type>(<issue>): <subject>
 
 <body>
+
+[log] <changelog entry>
 ```
 
-Where `<body>` is a brief explanation of what the commit does and why. It should be 1-3 sentences describing the changes and their purpose.
+**Scope is the GitHub issue number**, bare digits, and it must be the issue the work
+actually closes or advances. This is the only thing linking a commit to its issue:
+komity's changelog generator reads it back out with `/\((\w+-\d+|\d+)?\)/` and renders
+it as `[3]`. A commit with no scope is one nothing can trace. Omit it only for work
+that has no issue.
 
-Common types: `feat`, `ui`, `ux`, `fix`, `maintenance`, `dep`, `docs`, `refactor`, `test`
+`<subject>` is capped at **100 characters** — komity rejects the commit, it does not
+truncate. `<body>` explains what and why in a few sentences.
 
-**Type Definitions**:
+The `[log]` line is optional and separate from `<body>` on purpose: the body is for
+archaeology, the log line is the one sentence a user reads in the changelog. Omit it
+for work with no user-visible effect — refactors, test changes, internal moves.
 
-- `feat`: New end-user functionality or features
-- `ui`: User interface changes (layout, styling, components)
-- `ux`: User experience changes (interactions, flow improvements)
-- `fix`: Bug fixes for end-user issues
-- `maintenance`: Non-behavioral changes (scripts, configs, tooling)
-- `dep`: Dependency updates (add, remove, update packages)
-- `docs`: Documentation changes
-- `refactor`: Code restructuring without behavior change
-- `test`: Test-related changes
+**Types** — canonical form on the left, aliases komity accepts on input and rewrites
+on output. Writing `feat:` produces `feature:` in the history, so prefer the canonical
+spelling and keep the history uniform.
 
-Examples:
+| Type          | Aliases                | Use for                                    |
+| ------------- | ---------------------- | ------------------------------------------ |
+| `feature`     | `feat`                 | New end-user functionality                 |
+| `fix`         |                        | Bug fixes for end-user issues              |
+| `style`       |                        | User interface or user experience changes  |
+| `refactor`    |                        | Restructuring with no behaviour change     |
+| `perf`        |                        | Changes that improve performance           |
+| `maintenance` | `chore`, `ci`, `build` | Non-behavioural: scripts, configs, tooling |
+| `doc`         | `docs`                 | Documentation only                         |
+| `test`        |                        | Adding or correcting tests                 |
+| `dep`         | `deps`                 | Dependency add, remove or update           |
 
-- `feat: add user authentication flow
+There is no `ui` or `ux` type — komity rejects both outright. Use `style`, which is
+what they were.
 
-  Implemented JWT-based authentication with login/logout endpoints and middleware for protected routes.`
+DO NOT include AI attribution or co-author tags.
 
-- `ui: update button styling and layout
+**Writing one.** Stage the files, then hand komity a JSON payload. Without `--commit`
+it only prints the assembled message, which is the way to check it before it lands:
 
-  Updated button components with new design system colors and improved accessibility.`
+```bash
+git add <files>
+npx komity commit --input - <<'JSON'
+{
+  "type": "refactor",
+  "scope": "3",
+  "subject": "move config locating, reading and parsing into a helper",
+  "body": "Why it moved, and what it unblocks.",
+  "changelog": "Optional single line, omitted for internal work."
+}
+JSON
+```
 
-- `ux: improve form validation feedback
-
-  Enhanced form validation to show real-time feedback and clearer error messages.`
-
-- `fix: resolve navigation routing issue
-
-  Fixed a bug where navigation links were not updating the URL correctly in nested routes.`
-
-- `maintenance: add test scripts to package.json
-
-  Added npm scripts for running tests in different modes to improve developer workflow.`
-
-- `dep: update PrimeVue to latest version
-
-  Updated PrimeVue from v3.15 to v3.20 to include new components and bug fixes.`
+Re-run with `--commit` to create it. `komity commit` with no `--input` prompts
+interactively and requires a TTY.
 
 #### Commit Organization
 
