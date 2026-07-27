@@ -163,17 +163,24 @@ describe('CommandRunner internals', () => {
   describe('run', () => {
     let log: ReturnType<typeof vi.spyOn>;
     let write: ReturnType<typeof vi.spyOn>;
+    let writeError: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
       log = vi.spyOn(console, 'log').mockImplementation(() => {});
-      // The listr2 renderer writes straight to process.stdout, so its task lines land in
-      // the test output otherwise. console.log is spied separately and never reaches it.
+      // listr2 writes its task lines straight to a stream, bypassing console. Under
+      // vitest stdout is not a TTY, so it falls back to the `simple` renderer, whose
+      // logger splits by level: LISTR_LOGGER_STDERR_LEVELS -- RETRY, ROLLBACK, FAILED
+      // -- go to stderr, everything else to stdout. The failing-action cases hit the
+      // stderr half, so both streams need silencing. console.log is spied separately
+      // and never reaches either.
       write = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+      writeError = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
     });
 
     afterEach(() => {
       log.mockRestore();
       write.mockRestore();
+      writeError.mockRestore();
     });
 
     const output = (): string => log.mock.calls.map((call: unknown[]) => String(call[0])).join('\n');
