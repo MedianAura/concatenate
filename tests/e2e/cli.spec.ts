@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { nodeAction, runCLI, withProject, withTemporaryDirectory } from './helpers/cli.js';
+import { nodeAction, runCLI, withProject, withTemporaryDirectory, writeLocalBin } from './helpers/cli.js';
 
 /** A bare project root: enough for `getRootDirectoryPath`, with no `.concatenate/`. */
 async function writePackageJSON(directory: string, version = '1.0.0'): Promise<void> {
@@ -163,6 +163,133 @@ describe.concurrent('concatenate', () => {
         expect(exitCode).not.toBe(0);
       });
     });
+
+    it('fails on a config whose extension it cannot parse', async () => {
+      await withProject({ configs: { 'default.txt': 'type: series\nactions: []\n' } }, async (directory) => {
+        const { exitCode, stdout } = await runCLI(['default'], { cwd: directory });
+
+        expect(exitCode).not.toBe(0);
+        expect(stdout).toContain('Unsupported file type');
+      });
+    });
+
+    it('fails on duplicate action ids', async () => {
+      await withProject(
+        {
+          files: { 'a.mjs': 'console.log("a");' },
+          configs: {
+            'default.yaml': `type: series\nactions:\n${nodeAction('same', 'First', 'a.mjs')}${nodeAction('same', 'Second', 'a.mjs')}`,
+          },
+        },
+        async (directory) => {
+          const { exitCode, stdout } = await runCLI(['default', 'same'], { cwd: directory });
+
+          expect(exitCode).not.toBe(0);
+          expect(stdout).toContain('Duplicate action IDs');
+        },
+      );
+    });
+
+    it('fails outside any .concatenate directory', async () => {
+      const { exitCode } = await withTemporaryDirectory(async (directory) => {
+        await writePackageJSON(directory);
+        return runCLI(['default'], { cwd: directory });
+      });
+
+      expect(exitCode).not.toBe(0);
+    });
+  });
+
+  // json5 is a CommonJS default export destructured at module scope, which is the kind
+  // of thing that works in source and breaks once compiled. Nothing else exercises it.
+  describe('config formats', () => {
+    it('reads a .json config', async () => {
+      await withProject(
+        {
+          files: { 'a.mjs': 'console.log("json config ran");' },
+          configs: {
+            'plain.json': JSON.stringify({ type: 'series', actions: [{ id: 'a', label: 'Action A', command: 'node a.mjs' }] }),
+          },
+        },
+        async (directory) => {
+          const { exitCode, stdout } = await runCLI(['plain'], { cwd: directory });
+
+          expect(exitCode).toBe(0);
+          expect(stdout).toContain('json config ran');
+        },
+      );
+    });
+
+    it('reads a .json5 config, comments and trailing commas included', async () => {
+      await withProject(
+        {
+          files: { 'a.mjs': 'console.log("json5 config ran");' },
+          configs: {
+            'loose.json5': `{\n  // a comment json cannot carry\n  type: 'series',\n  actions: [{ id: 'a', label: 'Action A', command: 'node a.mjs' },],\n}\n`,
+          },
+        },
+        async (directory) => {
+          const { exitCode, stdout } = await runCLI(['loose'], { cwd: directory });
+
+          expect(exitCode).toBe(0);
+          expect(stdout).toContain('json5 config ran');
+        },
+      );
+    });
+  });
+
+  describe('execution mode', () => {
+    it('stops at the first failure in series', async () => {
+      await withProject(
+        {
+          files: { 'boom.mjs': 'process.exit(3);', 'after.mjs': 'console.log("ran after the failure");' },
+          configs: {
+            'default.yaml': `type: series\nactions:\n${nodeAction('boom', 'Failing action', 'boom.mjs')}${nodeAction('after', 'Later action', 'after.mjs')}`,
+          },
+        },
+        async (directory) => {
+          const { exitCode, stdout } = await runCLI(['default'], { cwd: directory });
+
+          expect(exitCode).not.toBe(0);
+          expect(stdout).not.toContain('ran after the failure');
+        },
+      );
+    });
+
+    it('runs every action in parallel even when one fails', async () => {
+      await withProject(
+        {
+          files: { 'boom.mjs': 'process.exit(3);', 'other.mjs': 'console.log("the other one still ran");' },
+          configs: {
+            'default.yaml': `type: parallel\nactions:\n${nodeAction('boom', 'Failing action', 'boom.mjs')}${nodeAction('other', 'Other action', 'other.mjs')}`,
+          },
+        },
+        async (directory) => {
+          const { exitCode, stdout } = await runCLI(['default'], { cwd: directory });
+
+          expect(exitCode).not.toBe(0);
+          expect(stdout).toContain('the other one still ran');
+        },
+      );
+    });
+  });
+
+  // Regression: execa does not put node_modules/.bin on PATH by default, so without
+  // preferLocal a globally installed CLI cannot run the checked project's own tools.
+  it("resolves a command from the checked project's node_modules/.bin", async () => {
+    await withProject(
+      {
+        configs: { 'default.yaml': `type: series\nactions:\n  - id: local\n    label: Local binary\n    command: e2etool\n` },
+      },
+      async (directory) => {
+        await writeLocalBin(directory, 'e2etool', 'the local binary ran');
+
+        const { exitCode, stdout } = await runCLI(['default'], { cwd: directory });
+
+        expect(exitCode).toBe(0);
+        expect(stdout).toContain('the local binary ran');
+      },
+    );
   });
 
   // Without the guard, enquirer waits on a stdin that never produces anything and the
@@ -188,6 +315,18 @@ describe.concurrent('concatenate', () => {
 
         expect(await read('check.yaml')).toContain('eslint');
         expect(await read('fix.yaml')).toContain('prettier');
+      });
+    });
+
+    it('writes json config files when asked for json', async () => {
+      await withTemporaryDirectory(async (directory) => {
+        await writePackageJSON(directory);
+
+        const { exitCode } = await runCLI(['setup', 'json'], { cwd: directory });
+        expect(exitCode).toBe(0);
+
+        const raw = await readFile(path.join(directory, '.concatenate', 'check.json'), { encoding: 'utf8' });
+        expect(() => JSON.parse(raw)).not.toThrow();
       });
     });
 

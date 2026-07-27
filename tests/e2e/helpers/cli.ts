@@ -81,6 +81,21 @@ export async function withProject(project: Project, callback: (directory: string
 }
 
 /**
+ * Writes an executable into the fixture's `node_modules/.bin`, so a bare command name
+ * resolves only if execa was given `preferLocal`. Platform-specific because that is
+ * what makes a file executable: a `.cmd` shim found through PATHEXT on Windows, a
+ * mode-0755 shell script elsewhere.
+ */
+export async function writeLocalBin(directory: string, name: string, message: string): Promise<void> {
+  const binDirectory = path.join(directory, 'node_modules', '.bin');
+  await mkdir(binDirectory, { recursive: true });
+
+  await (process.platform === 'win32'
+    ? writeFile(path.join(binDirectory, `${name}.cmd`), `@echo off\r\necho ${message}\r\n`, { encoding: 'utf8' })
+    : writeFile(path.join(binDirectory, name), `#!/bin/sh\necho "${message}"\n`, { encoding: 'utf8', mode: 0o755 }));
+}
+
+/**
  * An action invoking `node <script>`. Deliberately not `process.execPath`: on Windows
  * that is `C:\Program Files\nodejs\node.exe`, and `parseCommandString` splits on
  * whitespace, so the space would break the command in two. Bare `node` resolves
