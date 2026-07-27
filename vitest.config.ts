@@ -13,6 +13,13 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
+      // Without `include` v8 only reports files a test happened to load, so an entirely
+      // untested module reads as 100%. `all` makes the untested ones count.
+      include: ['src/**/*.ts'],
+      all: true,
+      // The CLI wiring: commander registration and the top-level parse. Exercised by
+      // the e2e suite, which runs in subprocesses where v8 cannot instrument it.
+      exclude: ['src/index.ts'],
       thresholds: {
         lines: 90,
         functions: 90,
