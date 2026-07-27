@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import { execa, ExecaError, parseCommandString, type Result } from 'execa';
 import { globby } from 'globby';
 import json5 from 'json5';
-import { Listr } from 'listr2';
+import { Listr, parseTimer, PRESET_TIMER } from 'listr2';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Readable } from 'node:stream';
@@ -19,6 +19,7 @@ const { parse: parseJSON } = json5;
 interface ListrContextReport {
   title: string;
   exitCode: number;
+  durationMs: number;
   stdout: string | Readable;
   stderr: string | Readable;
   message: string;
@@ -36,17 +37,41 @@ function handleOutput(status: Result | ExecaError, action: string, context: List
   context.reports.push({
     title: action,
     exitCode: status.exitCode ?? 0,
+    // execa measures this on both the result and the error, so a failing action is
+    // timed as well. It is absent only when the subprocess never started.
+    durationMs: status.durationMs ?? 0,
     stdout,
     stderr,
     message: messages.join('\n\n').trim(),
   });
 }
 
+/**
+ * One line per action, always. The detailed blocks below skip actions that printed
+ * nothing, which would otherwise hide the duration of exactly the actions worth
+ * timing -- a slow, quiet `tsc` produces no output at all.
+ */
+function printSummary(context: ListrContext): void {
+  if (context.reports.length === 0) return;
+
+  const width = Math.max(...context.reports.map((report) => report.title.length));
+
+  Logger.skipLine();
+  for (const report of context.reports) {
+    const hasFailed = report.exitCode !== 0;
+    const mark = hasFailed ? chalk.red('✖') : chalk.green('✔');
+
+    console.log(`${mark} ${report.title.padEnd(width)}  ${chalk.dim(parseTimer(report.durationMs))}`);
+  }
+}
+
 function printContext(context: ListrContext): void {
   for (const report of context.reports) {
     if (report.message.trim() === '') continue;
 
-    console.log(`\n\n${chalk.bgYellow(report.title)}`);
+    // parseTimer is listr2's own formatter, so the duration in the report reads the
+    // same as the one the live renderer showed while the action was running.
+    console.log(`\n\n${chalk.bgYellow(report.title)} ${chalk.dim(parseTimer(report.durationMs))}`);
     console.log('---------------------------------');
     console.log(report.message);
   }
@@ -67,6 +92,9 @@ export class CommandRunner {
       exitOnError: data.type === 'series',
       rendererOptions: {
         showErrorMessage: false,
+        // Live per-task duration. Checks are the kind of thing you watch, and knowing
+        // which action is the slow one is most of why you would watch.
+        timer: PRESET_TIMER,
       },
       ctx: globalContext,
     });
@@ -103,10 +131,12 @@ export class CommandRunner {
       await tasks.run();
     } catch {
       printContext(globalContext);
+      printSummary(globalContext);
       throw new TypeError('Some tasks failed');
     }
 
     printContext(globalContext);
+    printSummary(globalContext);
     if (globalContext.reports.some((report) => report.exitCode !== 0)) {
       throw new TypeError('Some tasks failed');
     }

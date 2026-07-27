@@ -80,6 +80,27 @@ describe.concurrent('concatenate', () => {
       );
     });
 
+    // The summary is the only place a silent action's duration is visible: the detailed
+    // blocks below it skip any action that printed nothing.
+    it('times every action, including the ones that print nothing', async () => {
+      await withProject(
+        {
+          files: { 'quiet.mjs': '', 'loud.mjs': 'console.log("some output");' },
+          configs: {
+            'default.yaml': `type: series\nactions:\n${nodeAction('quiet', 'Quiet action', 'quiet.mjs')}${nodeAction('loud', 'Loud action', 'loud.mjs')}`,
+          },
+        },
+        async (directory) => {
+          const { exitCode, stdout } = await runCLI(['default'], { cwd: directory });
+
+          expect(exitCode).toBe(0);
+          // Both appear in the summary with a duration, even the one with no output.
+          expect(stdout).toMatch(/Quiet action\s+\d/);
+          expect(stdout).toMatch(/Loud action\s+\d/);
+        },
+      );
+    });
+
     it('exits non-zero and surfaces the output when an action fails', async () => {
       await withProject(
         {
