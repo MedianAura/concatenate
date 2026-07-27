@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { defineConfig } from 'vitest/config';
+import { defaultExclude, defineConfig } from 'vitest/config';
 
 export default defineConfig({
   resolve: {
@@ -33,6 +33,12 @@ export default defineConfig({
         test: {
           name: 'unit',
           include: ['./tests/**/*.test.ts'],
+          // Not redundant with the `.test.ts` glob: it is the only thing stopping an
+          // e2e file named `*.test.ts` from being picked up as a unit test, run without
+          // the globalSetup that builds `dist/`, and counted against the coverage
+          // thresholds it was never meant to satisfy.
+          // Spread rather than replaced: assigning `exclude` drops vitest's defaults.
+          exclude: [...defaultExclude, './tests/e2e/**'],
         },
       },
       {

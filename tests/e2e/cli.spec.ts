@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { nodeAction, runCLI, withProject, withTemporaryDirectory, writeLocalBin } from './helpers/cli.js';
+import { parse as parseYAML } from 'yaml';
+import { binPath, groupAction, nodeAction, runCLI, withProject, withTemporaryDirectory, writeLocalBin } from './helpers/cli.js';
 
 /** A bare project root: enough for `getRootDirectoryPath`, with no `.concatenate/`. */
 async function writePackageJSON(directory: string, version = '1.0.0'): Promise<void> {
@@ -300,6 +301,82 @@ describe.concurrent('concatenate', () => {
 
       expect(exitCode).not.toBe(0);
       expect(stdout).toContain('not a TTY');
+    });
+  });
+
+  // The harness itself, not the CLI. The nesting tasks (#7, #8, #9) all build fixtures
+  // on these two seams -- subdirectory config keys and indented group YAML -- and
+  // neither is reachable from a case that only runs `concatenate`, because the schema
+  // still rejects `children`. Asserting the emitted YAML keeps them honest until #8
+  // lands and the same fixture can be executed for real.
+  describe('fixture harness', () => {
+    it('writes a config into a subdirectory of .concatenate', async () => {
+      await withProject(
+        {
+          files: { 'scripts/a.mjs': 'console.log("nested script");' },
+          configs: {
+            'shared/lint.yaml': `type: series\nactions:\n${groupAction('tsc', 'Type check', nodeAction('eslint', 'Lint', 'scripts/a.mjs', 6), { type: 'parallel' })}`,
+          },
+        },
+        async (directory) => {
+          const raw = await readFile(path.join(directory, '.concatenate', 'shared', 'lint.yaml'), { encoding: 'utf8' });
+
+          expect(parseYAML(raw)).toEqual({
+            type: 'series',
+            actions: [
+              {
+                id: 'tsc',
+                label: 'Type check',
+                type: 'parallel',
+                children: [{ id: 'eslint', label: 'Lint', command: 'node scripts/a.mjs' }],
+              },
+            ],
+          });
+
+          // The `files` map creates directories too: the nested leaf points at it.
+          await expect(readFile(path.join(directory, 'scripts', 'a.mjs'), { encoding: 'utf8' })).resolves.toContain('nested script');
+        },
+      );
+    });
+
+    it('omits type when the group does not declare one', () => {
+      const emitted = groupAction('tsc', 'Type check', nodeAction('eslint', 'Lint', 'a.mjs', 6));
+
+      expect(emitted).not.toContain('type:');
+      expect(parseYAML(`actions:\n${emitted}`)).toEqual({
+        actions: [{ id: 'tsc', label: 'Type check', children: [{ id: 'eslint', label: 'Lint', command: 'node a.mjs' }] }],
+      });
+    });
+
+    // Two levels deep, to pin the +4 rule the doc comment states: a group nested inside
+    // a group is where an off-by-two silently reparents a child.
+    it('nests a group inside a group', () => {
+      const leaf = nodeAction('eslint', 'Lint', 'a.mjs', 10);
+      const inner = groupAction('quality', 'Quality', leaf, { indent: 6, type: 'series' });
+      const outer = groupAction('tsc', 'Type check', inner, { type: 'parallel' });
+
+      expect(parseYAML(`actions:\n${outer}`)).toEqual({
+        actions: [
+          {
+            id: 'tsc',
+            label: 'Type check',
+            type: 'parallel',
+            children: [
+              {
+                id: 'quality',
+                label: 'Quality',
+                type: 'series',
+                children: [{ id: 'eslint', label: 'Lint', command: 'node a.mjs' }],
+              },
+            ],
+          },
+        ],
+      });
+    });
+
+    // The self-invoke fixtures in #7 need the real bin behind a `command:`.
+    it('exposes a bin path that exists', async () => {
+      await expect(readFile(binPath, { encoding: 'utf8' })).resolves.toContain('index.js');
     });
   });
 
