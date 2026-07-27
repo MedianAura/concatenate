@@ -1,6 +1,6 @@
 import { program } from 'commander';
 import { readFileSync } from 'node:fs';
-import { ZodError } from 'zod';
+import { prettifyError, ZodError } from 'zod';
 import { CommandRunner } from './controllers/command-runner.js';
 import { SetupRunner } from './controllers/setup-runner.js';
 import { getConfigFile } from './helpers/config-selector.js';
@@ -61,11 +61,18 @@ export async function run(): Promise<number> {
     Logger.skipLine();
 
     if (error instanceof ZodError) {
-      Logger.error(`The extension provided doesn't match the expected format.`);
+      Logger.error('The configuration file does not match the expected format.');
 
-      for (const message of error.format()._errors) {
-        Logger.error(message);
-      }
+      // Not `format()._errors`: that array only ever holds issues attached to the root
+      // of the schema, so every issue with a path -- which is all of them for a config
+      // -- reported as nothing at all. prettifyError walks the issue list and prints
+      // the dotted path with each message.
+      //
+      // println rather than error: the output is multi-line and its second line is an
+      // indented `→ at <path>`, which the `[ERROR] ` prefix would knock out of
+      // alignment on every line but the first.
+      Logger.skipLine();
+      Logger.println(prettifyError(error));
       return 4;
     }
 

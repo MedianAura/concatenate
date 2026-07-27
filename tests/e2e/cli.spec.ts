@@ -151,9 +151,25 @@ describe.concurrent('concatenate', () => {
 
     it('fails on a config that does not match the schema', async () => {
       await withProject({ configs: { 'default.yaml': 'type: sideways\nactions: []\n' } }, async (directory) => {
-        const { exitCode } = await runCLI(['default'], { cwd: directory });
+        const { exitCode, stdout } = await runCLI(['default'], { cwd: directory });
 
-        expect(exitCode).not.toBe(0);
+        expect(exitCode).toBe(4);
+        expect(stdout).toContain('type');
+      });
+    });
+
+    // Regression for #5: format()._errors only carries issues attached to the schema
+    // root, so every nested issue -- which is every issue a real config produces --
+    // printed a lead line and nothing else. The path is the whole point of the message.
+    it('names the offending field for a nested schema error', async () => {
+      await withProject({ configs: { 'default.yaml': 'type: series\nactions:\n  - id: a\n    label: Action A\n' } }, async (directory) => {
+        const { exitCode, stdout } = await runCLI(['default'], { cwd: directory });
+
+        expect(exitCode).toBe(4);
+        expect(stdout).toContain('actions[0].command');
+        expect(stdout).toContain('expected string, received undefined');
+        // The old lead line blamed the file extension no matter what actually failed.
+        expect(stdout).not.toContain('extension provided');
       });
     });
 
