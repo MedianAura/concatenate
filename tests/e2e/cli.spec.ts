@@ -461,6 +461,100 @@ describe.concurrent('concatenate', () => {
       );
     });
 
+    // The address space nesting introduces: a dotted path selects one nested action, and
+    // the group around it survives as a spine so the run still renders it.
+    it('selects a nested action by its dotted path', async () => {
+      await withProject(
+        {
+          files: { 'inner.mjs': 'console.log("inner ran");', 'other.mjs': 'console.log("other inner ran");', 'root.mjs': 'console.log("root ran");' },
+          configs: {
+            'default.yaml': `type: series\nactions:\n${nodeAction('eslint', 'Root ESLint', 'root.mjs')}${groupAction(
+              'tsc',
+              'Checking with TSC',
+              `${nodeAction('eslint', 'Checking with ESLint', 'inner.mjs', 6)}${nodeAction('prettier', 'Checking with Prettier', 'other.mjs', 6)}`,
+            )}`,
+          },
+        },
+        async (directory) => {
+          const { exitCode, stdout } = await runCLI(['default', 'tsc.eslint'], { cwd: directory });
+
+          expect(exitCode).toBe(0);
+          expect(stdout).toContain('inner ran');
+          expect(stdout).not.toContain('other inner ran');
+          expect(stdout).not.toContain('root ran');
+          // The spine is still rendered around the selected leaf.
+          expect(stdout).toContain('Checking with TSC > Checking with ESLint');
+        },
+      );
+    });
+
+    it('selecting a group runs its whole subtree', async () => {
+      await withProject(
+        {
+          files: { 'inner.mjs': 'console.log("inner ran");', 'other.mjs': 'console.log("other inner ran");', 'root.mjs': 'console.log("root ran");' },
+          configs: {
+            'default.yaml': `type: series\nactions:\n${nodeAction('eslint', 'Root ESLint', 'root.mjs')}${groupAction(
+              'tsc',
+              'Checking with TSC',
+              `${nodeAction('eslint', 'Checking with ESLint', 'inner.mjs', 6)}${nodeAction('prettier', 'Checking with Prettier', 'other.mjs', 6)}`,
+            )}`,
+          },
+        },
+        async (directory) => {
+          const { exitCode, stdout } = await runCLI(['default', 'tsc'], { cwd: directory });
+
+          expect(exitCode).toBe(0);
+          expect(stdout).toContain('inner ran');
+          expect(stdout).toContain('other inner ran');
+          expect(stdout).not.toContain('root ran');
+        },
+      );
+    });
+
+    // A bare id is the root-level action, never a nested one sharing the name.
+    it('selects the root-level action for a bare id that also exists nested', async () => {
+      await withProject(
+        {
+          files: { 'inner.mjs': 'console.log("inner ran");', 'root.mjs': 'console.log("root ran");' },
+          configs: {
+            'default.yaml': `type: series\nactions:\n${nodeAction('eslint', 'Root ESLint', 'root.mjs')}${groupAction(
+              'tsc',
+              'Checking with TSC',
+              nodeAction('eslint', 'Checking with ESLint', 'inner.mjs', 6),
+            )}`,
+          },
+        },
+        async (directory) => {
+          const { exitCode, stdout } = await runCLI(['default', 'eslint'], { cwd: directory });
+
+          expect(exitCode).toBe(0);
+          expect(stdout).toContain('root ran');
+          expect(stdout).not.toContain('inner ran');
+        },
+      );
+    });
+
+    it('lists dotted paths when an id is not found', async () => {
+      await withProject(
+        {
+          files: { 'inner.mjs': 'console.log("x");', 'root.mjs': 'console.log("y");' },
+          configs: {
+            'default.yaml': `type: series\nactions:\n${nodeAction('eslint', 'Root ESLint', 'root.mjs')}${groupAction(
+              'tsc',
+              'Checking with TSC',
+              nodeAction('eslint', 'Checking with ESLint', 'inner.mjs', 6),
+            )}`,
+          },
+        },
+        async (directory) => {
+          const { exitCode, stdout } = await runCLI(['default', 'nope'], { cwd: directory });
+
+          expect(exitCode).not.toBe(0);
+          expect(stdout).toContain('eslint, tsc, tsc.eslint');
+        },
+      );
+    });
+
     it('rejects an unknown key in an action', async () => {
       await withProject(
         {

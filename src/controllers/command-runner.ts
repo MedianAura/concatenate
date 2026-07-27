@@ -3,7 +3,7 @@ import { execa, ExecaError, parseCommandString, type Result } from 'execa';
 import { Listr, type ListrTask, parseTimer, PRESET_TIMER } from 'listr2';
 import path from 'node:path';
 import type { Readable } from 'node:stream';
-import { filterActionsByIds } from '../helpers/action-filter.js';
+import { filterTree } from '../helpers/action-filter.js';
 import { findConfigFile } from '../helpers/config-file.js';
 import { Logger } from '../helpers/logger.js';
 import { getConcatenateDirectoryPath } from '../helpers/root-directory-path.js';
@@ -93,8 +93,9 @@ export class CommandRunner {
       })),
     );
 
-    // Still flat: root-level ids only. Tree-aware selection by dotted path is #9.
-    const nodes = actionIds && actionIds.length > 0 ? filterActionsByIds(tree.nodes, actionIds) : tree.nodes;
+    // Dotted paths address the whole tree: `check tsc.eslint` selects one nested leaf and
+    // keeps the group around it as a spine.
+    const nodes = actionIds && actionIds.length > 0 ? filterTree(tree.nodes, actionIds) : tree.nodes;
 
     // Read once, not per action: every action of a run sits at the same depth.
     const currentDepth = Number(process.env.CONCATENATE_DEPTH ?? '0') || 0;
