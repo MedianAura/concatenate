@@ -22,7 +22,7 @@ export interface CLIResult {
  * Runs the built CLI in a subprocess. `reject: false` because the expected-failure
  * cases assert on `exitCode` rather than catching a throw.
  */
-export async function runCLI(arguments_: string[], options: { cwd?: string } = {}): Promise<CLIResult> {
+export async function runCLI(arguments_: string[], options: { cwd?: string; env?: Record<string, string> } = {}): Promise<CLIResult> {
   const result = await execa(process.execPath, [binPath, ...arguments_], {
     cwd: options.cwd ?? root,
     reject: false,
@@ -33,6 +33,10 @@ export async function runCLI(arguments_: string[], options: { cwd?: string } = {
       // update-notifier hits the npm registry and writes to a global cache.
       NO_UPDATE_NOTIFIER: '1',
       NODE_ENV: 'test',
+      // Last, so a case can override the defaults. The self-invocation cases need to
+      // start the CLI with CONCATENATE_ACTIVE already set, which is otherwise only ever
+      // set by a parent concatenate.
+      ...options.env,
     },
   });
 

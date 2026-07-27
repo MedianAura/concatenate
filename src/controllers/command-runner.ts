@@ -6,6 +6,7 @@ import type { Readable } from 'node:stream';
 import { findConfigFile, parseConfigData, readConfigFile } from '../helpers/config-file.js';
 import { Logger } from '../helpers/logger.js';
 import { getConcatenateDirectoryPath } from '../helpers/root-directory-path.js';
+import { assertNoSelfInvocation } from '../helpers/self-invocation.js';
 import type { ActionModelSchema } from '../models/action-model.js';
 import { ConfigModel, type ConfigModelSchema } from '../models/config-model.js';
 
@@ -72,10 +73,27 @@ function printContext(context: ListrContext): void {
 
 export class CommandRunner {
   public async run(config: string, actionIds?: string[]): Promise<void> {
-    const data = await this.validateData(config);
+    const { configFile, data } = await this.validateData(config);
+
+    // Before filtering, not after: an action the user did not select is still a config
+    // defect, and reporting it only when it happens to be selected makes the failure
+    // depend on the command line rather than on the file.
+    // Relative to the project root: findConfigFile returns an absolute path, and an
+    // absolute path in the message is noise the reader has to skip past to find the two
+    // segments that identify the file. Hoisted out of the call because
+    // `unicorn/max-nested-calls` caps the expression at three deep.
+    const projectRoot = path.resolve(getConcatenateDirectoryPath(), '..');
+
+    assertNoSelfInvocation(
+      data.actions.map((action) => ({ command: action.command, labelPath: [action.label] })),
+      path.relative(projectRoot, configFile),
+    );
 
     // Filter actions if IDs are provided
     const actions = actionIds && actionIds.length > 0 ? this.filterActionsByIds(data.actions, actionIds) : data.actions;
+
+    // Read once, not per action: every action of a run sits at the same depth.
+    const currentDepth = Number(process.env.CONCATENATE_DEPTH ?? '0') || 0;
 
     const globalContext = { reports: [] as ListrContextReport[] };
 
@@ -107,7 +125,10 @@ export class CommandRunner {
                 // Without this only the inherited PATH resolves them, which works under
                 // `pnpm run` but not from a global install of the CLI.
                 preferLocal: true,
-                env: { ...process.env, FORCE_COLOR: '1' },
+                // The marker the pre-scan cannot replace: it survives any amount of
+                // indirection, so `command: npm run check` where the script calls
+                // concatenate is caught by the child refusing to start.
+                env: { ...process.env, FORCE_COLOR: '1', CONCATENATE_ACTIVE: '1', CONCATENATE_DEPTH: String(currentDepth + 1) },
               });
 
               handleOutput(status, action.label, context);
@@ -135,13 +156,18 @@ export class CommandRunner {
     }
   }
 
-  private async validateData(config: string): Promise<ConfigModelSchema> {
+  /**
+   * Returns the resolved path alongside the data: the self-invocation message names the
+   * file the offending action came from, and by the time `run()` has the data the path
+   * is otherwise gone.
+   */
+  private async validateData(config: string): Promise<{ configFile: string; data: ConfigModelSchema }> {
     const configFile = await findConfigFile(config);
 
     const dataString = readConfigFile(configFile);
     const data = parseConfigData(configFile, dataString);
 
-    return ConfigModel.parse(data);
+    return { configFile, data: ConfigModel.parse(data) };
   }
 
   protected filterActionsByIds(actions: ActionModelSchema[], requestedIds: string[]): ActionModelSchema[] {

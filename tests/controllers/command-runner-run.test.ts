@@ -65,9 +65,11 @@ describe('CommandRunner internals', () => {
       globbyMock.mockResolvedValue(['/a/check.yaml']);
       readFileSyncMock.mockReturnValue('type: series\nactions:\n  - label: Lint\n    command: eslint .\n' as never);
 
+      // The resolved path rides along with the data: the self-invocation message names
+      // the file the offending action came from.
       await expect(runner.validateData('check')).resolves.toEqual({
-        type: 'series',
-        actions: [{ label: 'Lint', command: 'eslint .' }],
+        configFile: '/a/check.yaml',
+        data: { type: 'series', actions: [{ label: 'Lint', command: 'eslint .' }] },
       });
     });
 

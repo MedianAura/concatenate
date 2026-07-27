@@ -320,6 +320,89 @@ describe.concurrent('concatenate', () => {
     });
   });
 
+  // Regression for #7: a config invoking concatenate re-read the same file from the same
+  // cwd forever, buffering every level's output behind `stdio: 'pipe'`, so the user saw a
+  // spinner that never resolved and nothing else. Two independent layers now stop it.
+  describe('self-invocation', () => {
+    it('refuses a config that runs concatenate, naming the offending action', async () => {
+      await withProject(
+        {
+          files: { 'a.mjs': 'console.log("never runs");' },
+          configs: {
+            'default.yaml': `type: series\nactions:\n${nodeAction('a', 'Action A', 'a.mjs')}  - id: loop\n    label: Recursive action\n    command: concatenate default\n`,
+          },
+        },
+        async (directory) => {
+          const { exitCode, stdout } = await runCLI(['default'], { cwd: directory });
+
+          expect(exitCode).toBe(5);
+          expect(stdout).toContain('use import instead');
+          expect(stdout).toContain('Recursive action');
+          expect(stdout).toContain('.concatenate/default.yaml');
+          expect(stdout).toContain('command: concatenate default');
+          // The pre-scan runs before anything spawns, so the clean action never ran.
+          expect(stdout).not.toContain('never runs');
+        },
+      );
+    });
+
+    // The layer the pre-scan cannot be: the fixture spawns the real bin from a script,
+    // so no scan of the `command:` string can see concatenate in it.
+    it('exits 5 and names the escape hatch when reached through indirection', async () => {
+      await withProject(
+        {
+          files: {
+            'indirect.mjs': `import { spawnSync } from 'node:child_process';\nconst r = spawnSync(process.execPath, [${JSON.stringify(binPath)}, 'default'], { encoding: 'utf8' });\nconsole.log(r.stdout ?? '');\nconsole.log('child exited ' + String(r.status));\n`,
+          },
+          configs: { 'default.yaml': `type: series\nactions:\n${nodeAction('indirect', 'Indirect action', 'indirect.mjs')}` },
+        },
+        async (directory) => {
+          const { stdout } = await runCLI(['default'], { cwd: directory });
+
+          expect(stdout).toContain('child exited 5');
+          expect(stdout).toContain('CONCATENATE_ALLOW_NESTED');
+        },
+      );
+    });
+
+    it('lets a nested run through when CONCATENATE_ALLOW_NESTED is set', async () => {
+      await withProject(
+        {
+          files: { 'env.mjs': 'console.log("active=" + String(process.env.CONCATENATE_ACTIVE) + " depth=" + String(process.env.CONCATENATE_DEPTH));' },
+          configs: { 'default.yaml': `type: series\nactions:\n${nodeAction('env', 'Env action', 'env.mjs')}` },
+        },
+        async (directory) => {
+          // Both markers, as a real parent concatenate would set them: ACTIVE is what
+          // the guard reads, DEPTH is what the next level increments.
+          const { exitCode, stdout } = await runCLI(['default'], {
+            cwd: directory,
+            env: { CONCATENATE_ACTIVE: '1', CONCATENATE_ALLOW_NESTED: '1', CONCATENATE_DEPTH: '1' },
+          });
+
+          expect(exitCode).toBe(0);
+          // Depth keeps counting even when the guard is waived, so a legitimately nested
+          // run still reports how deep it is.
+          expect(stdout).toContain('active=1 depth=2');
+        },
+      );
+    });
+
+    it('marks every action it spawns', async () => {
+      await withProject(
+        {
+          files: { 'env.mjs': 'console.log("active=" + String(process.env.CONCATENATE_ACTIVE) + " depth=" + String(process.env.CONCATENATE_DEPTH));' },
+          configs: { 'default.yaml': `type: series\nactions:\n${nodeAction('env', 'Env action', 'env.mjs')}` },
+        },
+        async (directory) => {
+          const { exitCode, stdout } = await runCLI(['default'], { cwd: directory });
+
+          expect(exitCode).toBe(0);
+          expect(stdout).toContain('active=1 depth=1');
+        },
+      );
+    });
+  });
+
   // The harness itself, not the CLI. The nesting tasks (#7, #8, #9) all build fixtures
   // on these two seams -- subdirectory config keys and indented group YAML -- and
   // neither is reachable from a case that only runs `concatenate`, because the schema

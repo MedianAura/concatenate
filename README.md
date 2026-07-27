@@ -325,7 +325,7 @@ actions:
   - label: Install Dependencies
     command: npm ci
   - label: Run Linters
-    command: concatenate check
+    command: eslint .
   - label: Run Tests
     command: npm test
   - label: Build Project
@@ -335,6 +335,12 @@ actions:
 ```bash
 concatenate ci
 ```
+
+> **Do not call concatenate from a config.** An earlier version of this example used
+> `command: concatenate check` to reuse another config. That re-read the same file from
+> the same directory and recursed until the machine ran out of memory, printing nothing
+> at all along the way, so it is now refused outright — see
+> [Self-invocation](#self-invocation) below.
 
 ### Example 2: Pre-commit Checks
 
@@ -471,16 +477,64 @@ concatenate check eslint prettier
 
 **Solution**: Rename your file to use `.yaml`, `.yml`, `.json`, or `.json5` extension.
 
-### Error: "The extension provided doesn't match the expected format"
+### Error: "The provided input does not match the expected format"
 
-**Cause**: Invalid extension passed to `setup` command.
+**Cause**: Something failed schema validation. The lines below the message name what: a
+dotted field path for a malformed configuration file, or the accepted values for an
+invalid `setup` extension. Exit code 4.
 
-**Solution**: Use only `yaml` or `json` as the extension argument:
+**Solution**: For `setup`, use only `yaml` or `json` as the extension argument:
 
 ```bash
 concatenate setup yaml
 # OR
 concatenate setup json
+```
+
+For a configuration file, the reported path is the field to fix:
+
+```
+[ERROR] The provided input does not match the expected format.
+
+✖ Invalid input: expected string, received undefined
+  → at actions[0].command
+```
+
+### Self-invocation
+
+**Cause**: A configuration asks concatenate to run concatenate. Actions run from the
+project root, so the child finds the same `.concatenate/` directory and re-reads the same
+file — forever. Every level buffers its child's output, so nothing reaches the terminal
+while it happens. `type: parallel` makes it exponential rather than linear.
+
+This is refused outright, with exit code 5, by two independent checks:
+
+- Before anything is spawned, every `command:` is scanned for the concatenate binary —
+  including `npx concatenate`, `pnpm exec concatenate` and an explicit
+  `./node_modules/.bin/concatenate`.
+- Every spawned action carries `CONCATENATE_ACTIVE=1` and `CONCATENATE_DEPTH=<n>`. A
+  concatenate that starts with `CONCATENATE_ACTIVE` set refuses to run, which catches the
+  indirect cases a text scan cannot see — `command: npm run check` where the `check`
+  script is itself `concatenate check`.
+
+```
+[ERROR] Avoid using concatenate within itself, use import instead for better CLI flow.
+
+  Run Linters
+  .concatenate/ci.yaml
+  command: concatenate check
+```
+
+**Solution**: Inline the commands you wanted to reuse, or call the underlying tools
+directly.
+
+**Escape hatch**: `CONCATENATE_ALLOW_NESTED=1` disables the environment check. It exists
+for one case — a monorepo where an action runs a sub-package build that legitimately has
+its own concatenate. It does not disable the pre-scan, because a config naming
+concatenate directly is always the loop.
+
+```bash
+CONCATENATE_ALLOW_NESTED=1 concatenate ci
 ```
 
 ### Tasks hanging or not responding
