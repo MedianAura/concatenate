@@ -1,9 +1,12 @@
-import { kitchen } from 'alias-kitchen';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   resolve: {
-    alias: kitchen({ recipe: 'vite' }),
+    // Doit refléter `paths` de tsconfig.json : les tests importent via `@/`.
+    alias: {
+      '@': fileURLToPath(new URL('src', import.meta.url)),
+    },
   },
   test: {
     coverage: {

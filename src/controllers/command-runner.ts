@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { execaCommand, ExecaError, type Result } from 'execa';
+import { execa, ExecaError, parseCommandString, type Result } from 'execa';
 import { globby } from 'globby';
 import json5 from 'json5';
 import { Listr } from 'listr2';
@@ -10,7 +10,7 @@ import { parse as parseYaml } from 'yaml';
 import { Logger } from '../helpers/logger.js';
 import { getConcatenateDirectoryPath } from '../helpers/root-directory-path.js';
 import type { ActionModelSchema } from '../models/action-model.js';
-import { ConfigurationModel, type ConfigurationModelSchema } from '../models/configuration-model.js';
+import { ConfigModel, type ConfigModelSchema } from '../models/config-model.js';
 
 // Need to be disable to work once compiled with TSC.
 // eslint-disable-next-line import-x/no-named-as-default-member
@@ -57,16 +57,13 @@ export class CommandRunner {
     const data = await this.validateData(config);
 
     // Filter actions if IDs are provided
-    let actions = data.actions;
-    if (actionIds && actionIds.length > 0) {
-      actions = this.filterActionsByIds(data.actions, actionIds);
-    }
+    const actions = actionIds && actionIds.length > 0 ? this.filterActionsByIds(data.actions, actionIds) : data.actions;
 
     const globalContext = { reports: [] as ListrContextReport[] };
 
     const tasks = new Listr<ListrContext>([], {
       concurrent: data.type === 'parallel',
-      collectErrors: 'full',
+      collectErrors: true,
       exitOnError: data.type === 'series',
       rendererOptions: {
         showErrorMessage: false,
@@ -80,16 +77,22 @@ export class CommandRunner {
           title: action.label,
           task: async (context): Promise<void> => {
             try {
-              const status = await execaCommand(action.command, {
+              // execa 10 a retiré `execaCommand` : même découpage sans shell, en deux temps.
+              const [file, ...commandArguments] = parseCommandString(action.command);
+              const status = await execa(file, commandArguments, {
                 cwd: path.resolve(getConcatenateDirectoryPath(), '..'),
                 stdio: 'pipe',
+                // Les commandes visent les binaires du projet vérifié (eslint, tsc…).
+                // Sans ça, seul le PATH hérité les résout — ce qui marche sous `pnpm run`
+                // mais pas depuis une installation globale de la CLI.
+                preferLocal: true,
                 env: { ...process.env, FORCE_COLOR: '1' },
               });
 
               handleOutput(status, action.label, context);
             } catch (error: unknown) {
               handleOutput(error as ExecaError, action.label, context);
-              throw new Error(action.label);
+              throw new Error(action.label, { cause: error });
             }
           },
         },
@@ -125,7 +128,7 @@ export class CommandRunner {
       return fs.readFileSync(configFile, { encoding: 'utf8' });
     } catch (error: unknown) {
       if (error instanceof Error) {
-        throw new TypeError(`There was an issue trying to parse the configuration file: ${error.message}`);
+        throw new TypeError(`There was an issue trying to parse the configuration file: ${error.message}`, { cause: error });
       }
       return '';
     }
@@ -136,20 +139,22 @@ export class CommandRunner {
 
     if (ext === '.yaml' || ext === '.yml') {
       return parseYaml(data);
-    } else if (ext === '.json' || ext === '.json5') {
-      return parseJSON(data);
-    } else {
-      throw new Error(`Unsupported file type: ${ext}`);
     }
+
+    if (ext === '.json' || ext === '.json5') {
+      return parseJSON(data);
+    }
+
+    throw new Error(`Unsupported file type: ${ext}`);
   }
 
-  private async validateData(config: string): Promise<ConfigurationModelSchema> {
+  private async validateData(config: string): Promise<ConfigModelSchema> {
     const configFile = await this.getConfigFile(config);
 
     const dataString = this.readConfigFile(configFile);
     const data = this.parseConfigData(configFile, dataString);
 
-    return ConfigurationModel.parse(data);
+    return ConfigModel.parse(data);
   }
 
   protected filterActionsByIds(actions: ActionModelSchema[], requestedIds: string[]): ActionModelSchema[] {
@@ -161,7 +166,7 @@ export class CommandRunner {
       }
     }
 
-    const duplicateIds = [...idCounts.entries()].filter(([_, count]) => count > 1).map(([id]) => id);
+    const duplicateIds = [...idCounts].filter(([, count]) => count > 1).map(([id]) => id);
 
     if (duplicateIds.length > 0) {
       throw new Error(`Duplicate action IDs found in configuration: ${duplicateIds.join(', ')}. Each action must have a unique ID.`);
@@ -175,13 +180,13 @@ export class CommandRunner {
     const missingIds = requestedIds.filter((id) => !availableIds.has(id));
     if (missingIds.length > 0) {
       const availableIdsList = [...availableIds].join(', ');
-      throw new Error(`The following action IDs were not found: ${missingIds.join(', ')}.\n` + `Available IDs: ${availableIdsList || '(none - no actions have IDs defined)'}`);
+      throw new Error(`The following action IDs were not found: ${missingIds.join(', ')}.\nAvailable IDs: ${availableIdsList || '(none - no actions have IDs defined)'}`);
     }
 
     // Warn about actions without IDs that will be excluded
     const actionsWithoutIds = actions.filter((action) => action.id === undefined);
     if (actionsWithoutIds.length > 0) {
-      Logger.warn(`Warning: Some actions do not have IDs defined and will be excluded.\n` + `Actions without IDs: ${actionsWithoutIds.map((a) => a.label).join(', ')}`);
+      Logger.warn(`Warning: Some actions do not have IDs defined and will be excluded.\nActions without IDs: ${actionsWithoutIds.map((a) => a.label).join(', ')}`);
       Logger.skipLine();
     }
 

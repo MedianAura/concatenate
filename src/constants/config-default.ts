@@ -1,6 +1,6 @@
-import type { ConfigurationModelSchema } from '../models/configuration-model.js';
+import type { ConfigModelSchema } from '../models/config-model.js';
 
-export const ConfigurationDefault: Record<string, ConfigurationModelSchema> = {
+export const ConfigDefault: Record<string, ConfigModelSchema> = {
   check: {
     type: 'parallel',
     actions: [

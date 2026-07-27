@@ -2,7 +2,7 @@ import { ensureDirSync } from 'fs-extra';
 import fs from 'node:fs';
 import path from 'node:path';
 import { stringify as stringifyYaml } from 'yaml';
-import { ConfigurationDefault } from '../constants/configuration-default.js';
+import { ConfigDefault } from '../constants/config-default.js';
 import { Logger } from '../helpers/logger.js';
 import { getRootDirectoryPath } from '../helpers/root-directory-path.js';
 import { CommandSetupModel, type SetupFileExtensionType } from '../models/command-model.js';
@@ -12,9 +12,9 @@ export class SetupRunner {
     const currentExtension: SetupFileExtensionType = CommandSetupModel.parse(extension);
 
     Logger.title(`Creating configuration with format: ${extension}`);
-    for (const configuration in ConfigurationDefault) {
-      const writable = this.getString(ConfigurationDefault[configuration], currentExtension);
-      const configFile = path.resolve(getRootDirectoryPath(), '.concatenate', `${configuration}.${currentExtension}`);
+    for (const [config, data] of Object.entries(ConfigDefault)) {
+      const writable = this.getString(data, currentExtension);
+      const configFile = path.resolve(getRootDirectoryPath(), '.concatenate', `${config}.${currentExtension}`);
 
       ensureDirSync(path.dirname(configFile));
 

@@ -51,7 +51,9 @@ export async function run(): Promise<number> {
         Logger.error(message);
       }
       return 4;
-    } else if (error instanceof Error) {
+    }
+
+    if (error instanceof Error) {
       Logger.error(error.message);
       return 1;
     }

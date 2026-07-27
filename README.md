@@ -539,7 +539,7 @@ actions:
   - id: eslint
     label: First lint check
     command: eslint .
-  - id: eslint  # ERROR: Duplicate!
+  - id: eslint # ERROR: Duplicate!
     label: Second lint check
     command: eslint --fix .
 

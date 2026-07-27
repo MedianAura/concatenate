@@ -12,5 +12,4 @@ updateNotifier({
 
 const status = await run();
 
-// eslint-disable-next-line no-undef
 process.exit(status);

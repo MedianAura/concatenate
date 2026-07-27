@@ -2,6 +2,7 @@ out
 dist
 .claude
 package-lock.json
+pnpm-lock.yaml
 LICENSE.md
 tsconfig.json
 tsconfig.*.json

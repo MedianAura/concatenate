@@ -11,8 +11,8 @@ function print(message: string): void {
 }
 
 function clear(): void {
-  process.stdout.write('\u001B[2J');
-  process.stdout.write('\u001B[0f');
+  process.stdout.write('\u{1B}[2J');
+  process.stdout.write('\u{1B}[0f');
 }
 
 function println(message: string): void {

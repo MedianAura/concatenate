@@ -20,7 +20,6 @@
     "noImplicitOverride": true,
     "lib": ["ES2022"],
     "types": ["node"],
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }
