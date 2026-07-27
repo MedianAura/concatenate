@@ -1,20 +1,13 @@
 import chalk from 'chalk';
 import { execa, ExecaError, parseCommandString, type Result } from 'execa';
-import { globby } from 'globby';
-import json5 from 'json5';
 import { Listr, parseTimer, PRESET_TIMER } from 'listr2';
-import fs from 'node:fs';
 import path from 'node:path';
 import type { Readable } from 'node:stream';
-import { parse as parseYaml } from 'yaml';
+import { findConfigFile, parseConfigData, readConfigFile } from '../helpers/config-file.js';
 import { Logger } from '../helpers/logger.js';
 import { getConcatenateDirectoryPath } from '../helpers/root-directory-path.js';
 import type { ActionModelSchema } from '../models/action-model.js';
 import { ConfigModel, type ConfigModelSchema } from '../models/config-model.js';
-
-// Need to be disable to work once compiled with TSC.
-// eslint-disable-next-line import-x/no-named-as-default-member
-const { parse: parseJSON } = json5;
 
 interface ListrContextReport {
   title: string;
@@ -142,47 +135,11 @@ export class CommandRunner {
     }
   }
 
-  private async getConfigFile(config: string = 'default'): Promise<string> {
-    const _configPath = path.resolve(`${getConcatenateDirectoryPath()}/`);
-
-    const configFiles = await globby(`${config}.*`, { dot: true, cwd: _configPath, absolute: true });
-    if (configFiles.length !== 1) {
-      throw new Error(`There was an issue trying to find the configuration file for ${config}`);
-    }
-
-    return configFiles.pop() ?? '';
-  }
-
-  private readConfigFile(configFile: string): string {
-    try {
-      return fs.readFileSync(configFile, { encoding: 'utf8' });
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        throw new TypeError(`There was an issue trying to parse the configuration file: ${error.message}`, { cause: error });
-      }
-      return '';
-    }
-  }
-
-  private parseConfigData(configFile: string, data: string): unknown {
-    const { ext } = path.parse(configFile);
-
-    if (ext === '.yaml' || ext === '.yml') {
-      return parseYaml(data);
-    }
-
-    if (ext === '.json' || ext === '.json5') {
-      return parseJSON(data);
-    }
-
-    throw new Error(`Unsupported file type: ${ext}`);
-  }
-
   private async validateData(config: string): Promise<ConfigModelSchema> {
-    const configFile = await this.getConfigFile(config);
+    const configFile = await findConfigFile(config);
 
-    const dataString = this.readConfigFile(configFile);
-    const data = this.parseConfigData(configFile, dataString);
+    const dataString = readConfigFile(configFile);
+    const data = parseConfigData(configFile, dataString);
 
     return ConfigModel.parse(data);
   }

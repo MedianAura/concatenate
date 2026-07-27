@@ -17,17 +17,16 @@ vi.mock('@/helpers/root-directory-path.js', () => ({
   getConcatenateDirectoryPath: (): string => '/projects/app/.concatenate',
 }));
 
-// The config pipeline is private; the tests drive it directly rather than through the
-// Listr run, which would need a full subprocess mock for every case.
+// `validateData` and `filterActionsByIds` are private; the tests drive them directly
+// rather than through the Listr run, which would need a full subprocess mock for every
+// case. Locating, reading and parsing moved to helpers/config-file.ts and are tested
+// there, without a class to construct -- filterActionsByIds follows in #4.
 //
 // Deliberately not an intersection with CommandRunner: TypeScript reduces
 // `CommandRunner & { getConfigFile... }` to `never`, because the member exists in both
 // constituents and is private in one. The cast below goes through `unknown` instead.
 interface Privates {
   filterActionsByIds(actions: unknown[], requestedIds: string[]): unknown;
-  getConfigFile(config?: string): Promise<string>;
-  parseConfigData(configFile: string, data: string): unknown;
-  readConfigFile(configFile: string): string;
   validateData(config: string): Promise<unknown>;
 }
 
@@ -58,86 +57,6 @@ describe('CommandRunner internals', () => {
       ];
 
       expect(() => runner.filterActionsByIds(actions, ['x'])).toThrow('none - no actions have IDs defined');
-    });
-  });
-
-  describe('getConfigFile', () => {
-    it('returns the single match', async () => {
-      globbyMock.mockResolvedValue(['/projects/app/.concatenate/check.yaml']);
-
-      await expect(runner.getConfigFile('check')).resolves.toBe('/projects/app/.concatenate/check.yaml');
-    });
-
-    it('defaults to the "default" config', async () => {
-      globbyMock.mockResolvedValue(['/projects/app/.concatenate/default.yaml']);
-
-      await runner.getConfigFile();
-
-      expect(globbyMock).toHaveBeenCalledWith('default.*', expect.anything());
-    });
-
-    it('throws when nothing matches', async () => {
-      globbyMock.mockResolvedValue([]);
-
-      await expect(runner.getConfigFile('check')).rejects.toThrow('There was an issue trying to find the configuration file for check');
-    });
-
-    // Two files named `check.*` are ambiguous: there is no rule for which wins.
-    it('throws when more than one matches', async () => {
-      globbyMock.mockResolvedValue(['/a/check.yaml', '/a/check.json']);
-
-      await expect(runner.getConfigFile('check')).rejects.toThrow();
-    });
-  });
-
-  describe('parseConfigData', () => {
-    it.each(['.yaml', '.yml'])('parses %s', (extension) => {
-      expect(runner.parseConfigData(`c${extension}`, 'type: series\nactions: []\n')).toEqual({ type: 'series', actions: [] });
-    });
-
-    it('parses .json', () => {
-      expect(runner.parseConfigData('c.json', '{"type":"series","actions":[]}')).toEqual({ type: 'series', actions: [] });
-    });
-
-    // json5 is destructured off a CommonJS default export; this is the guard on that.
-    it('parses .json5 with comments and trailing commas', () => {
-      expect(runner.parseConfigData('c.json5', "{ /* hi */ type: 'series', actions: [], }")).toEqual({ type: 'series', actions: [] });
-    });
-
-    it('throws on any other extension', () => {
-      expect(() => runner.parseConfigData('c.toml', '')).toThrow('Unsupported file type: .toml');
-    });
-  });
-
-  describe('readConfigFile', () => {
-    it('returns the file contents', () => {
-      readFileSyncMock.mockReturnValue('type: series' as never);
-
-      expect(runner.readConfigFile('/a/check.yaml')).toBe('type: series');
-    });
-
-    // Nothing in Node throws a non-Error here, but useUnknownInCatchVariables means the
-    // code has to handle it, and the fallback should be an empty read, not a crash.
-    it('returns an empty string when the thrown value is not an Error', () => {
-      readFileSyncMock.mockImplementation(() => {
-        throw 'a bare string';
-      });
-
-      expect(runner.readConfigFile('/a/check.yaml')).toBe('');
-    });
-
-    it('wraps a read failure and keeps the cause', () => {
-      const cause = new Error('ENOENT: no such file');
-      readFileSyncMock.mockImplementation(() => {
-        throw cause;
-      });
-
-      expect(() => runner.readConfigFile('/a/missing.yaml')).toThrow('There was an issue trying to parse the configuration file');
-      try {
-        runner.readConfigFile('/a/missing.yaml');
-      } catch (error) {
-        expect((error as Error).cause).toBe(cause);
-      }
     });
   });
 
