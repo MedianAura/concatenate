@@ -13,6 +13,7 @@ A powerful CLI tool for executing multiple commands in series or parallel workfl
 - [How It Works](#how-it-works)
 - [Quick Start](#quick-start)
 - [Configuration](#configuration)
+- [Nested configurations](#nested-configurations)
 - [Commands](#commands)
 - [Examples](#examples)
 - [Troubleshooting](#troubleshooting)
@@ -66,7 +67,7 @@ For better integration into your project's workflow, add concatenate commands to
 }
 ```
 
-**Requirements**: Node.js >= 18.0.0
+**Requirements**: Node.js >= 22.12.0
 
 ## How It Works
 
@@ -148,14 +149,30 @@ Configuration files must be placed in a `.concatenate/` directory at your **proj
 
 ### Configuration Schema
 
+An action is exactly one of three forms — a **leaf** that runs a command, a **group**
+that nests more actions, or an **import** that pulls in another config file:
+
 ```yaml
 type: series | parallel
 actions:
+  # Leaf: runs a command.
   - label: Display name for the task
     command: Command to execute
-  - label: Another task
-    command: Another command
+
+  # Group: nests actions, with its own execution mode.
+  - label: A group of tasks
+    type: parallel
+    children:
+      - label: Nested task
+        command: Another command
+
+  # Import: runs another config file as a subtree.
+  - label: Shared checks
+    import: ./shared/lint.yaml
 ```
+
+Unknown keys are rejected. A node carrying two of `command`, `children` and `import`
+matches none of the three forms and fails validation.
 
 ### YAML Example
 
@@ -196,13 +213,113 @@ actions:
 
 ### Field Descriptions
 
-| Field               | Type                       | Required | Description                                                                                                                                    |
-| ------------------- | -------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `type`              | `"series"` \| `"parallel"` | Yes      | Execution mode for the actions                                                                                                                 |
-| `actions`           | Array                      | Yes      | List of command actions to execute                                                                                                             |
-| `actions[].id`      | string                     | No       | Unique identifier for the action. Required only if you want to filter and run specific actions by ID. Must be unique within the configuration. |
-| `actions[].label`   | string                     | Yes      | Display name shown during execution. Use clear and descriptive labels to easily identify tasks.                                                |
-| `actions[].command` | string                     | Yes      | Shell command to execute                                                                                                                       |
+| Field                | Type                       | Required | Description                                                                                                                    |
+| -------------------- | -------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `type`               | `"series"` \| `"parallel"` | Yes      | Execution mode for the actions                                                                                                 |
+| `actions`            | Array                      | Yes      | List of command actions to execute                                                                                             |
+| `actions[].id`       | string                     | No       | Identifier used to select this action from the command line. Must be unique **among its siblings**, not across the whole tree. |
+| `actions[].label`    | string                     | Yes      | Display name shown during execution. Use clear and descriptive labels to easily identify tasks.                                |
+| `actions[].command`  | string                     | Yes\*    | Shell command to execute. Required **unless** `children` or `import` is used — exactly one of the three.                       |
+| `actions[].children` | Array                      | No       | Nested actions. Makes this action a group; see [Nested configurations](#nested-configurations).                                |
+| `actions[].import`   | string                     | No       | Path to another config file, relative to **this** file, with an explicit extension.                                            |
+| `actions[].type`     | `"series"` \| `"parallel"` | No       | Execution mode for a group's children. Groups only; defaults to `series`.                                                      |
+
+## Nested configurations
+
+Two ways to compose a workflow, both running in the same process as native subtasks.
+
+### Groups: `children`
+
+A group nests actions under one label and carries its own execution mode:
+
+```yaml
+type: parallel
+actions:
+  - id: eslint
+    label: Checking with ESLint
+    command: eslint . --format pretty --cache
+  - id: tsc
+    label: Checking with TSC
+    type: series
+    children:
+      - id: eslint
+        label: Checking with ESLint
+        command: eslint . --format pretty --cache
+      - id: types
+        label: Type check
+        command: tsc --noEmit
+```
+
+A group's `type` is independent of its parent's and **defaults to `series`**. The rule
+that applies at the root applies at every level, which is the useful part: the `series`
+group above stops at its first failing child while the root's other actions keep running
+in parallel.
+
+Ids are unique **per sibling set**, so `eslint` at the root and `eslint` under `tsc` are
+both legal — they are different actions that happen to share a short name. Nesting is not
+depth-limited; it is bounded by the file, and it cannot loop.
+
+### Imports: `import`
+
+An imported file is an ordinary config file. It is runnable on its own, and any config
+you already have is importable as-is:
+
+```yaml
+# .concatenate/check.yaml
+type: parallel
+actions:
+  - id: shared
+    label: Shared checks
+    import: ./shared/lint.yaml
+```
+
+```yaml
+# .concatenate/shared/lint.yaml
+type: series
+actions:
+  - id: eslint
+    label: Checking with ESLint
+    command: eslint .
+```
+
+- **Paths are relative to the importing file**, not to the project root or `.concatenate/`.
+- **An explicit extension is required.** `./shared/lint.yaml`, never `./shared/lint` —
+  the extension is exactly what lets an import skip the `<name>.*` lookup that a root
+  config name goes through, where two files named `lint.*` would be ambiguous.
+- **The importing action supplies the label; the imported file's own `type` governs its
+  subtree.** There is no override key. The file runs the same way whether you run it
+  directly or import it.
+
+### Cycles, diamonds and the depth cap
+
+Cycle detection is over the **current import chain**, not a set of everything already
+seen. Two consequences, and the second is the one people trip on:
+
+- `a → b → a` is rejected: `Import cycle detected: a.yaml -> b.yaml -> a.yaml`.
+- A **diamond is legal**. If `a` imports `b` and `c`, and both import `d`, then `d` is
+  resolved **twice** and its actions run **twice**, once under each branch. This is a
+  recursion guard, not de-duplication.
+
+Imports are capped at a depth of **10**. The cap applies to imports only — `children`
+nesting is bounded by the file it is written in, so capping it would only reject a
+legitimately deep inline config.
+
+### Reports
+
+Nested actions are reported by their full path, so a failure is unambiguous:
+
+```
+✔ Checking with ESLint                      0.1s
+✔ Checking with TSC > Checking with ESLint  0.0s
+✖ Checking with TSC > Type check            0.0s
+```
+
+A diamond shows the same file reached twice, once per branch:
+
+```
+✔ Branch B > B to D > Shared leaf  0.1s
+✔ Branch C > C to D > Shared leaf  0.1s
+```
 
 ## Commands
 
@@ -219,7 +336,7 @@ concatenate [file] [actionIds...]
 **Arguments:**
 
 - `file` (optional): Name of the configuration file (without extension)
-- `actionIds` (optional): Space-separated list of action IDs to execute. If provided, only actions with matching IDs will run. All specified IDs must exist in the configuration.
+- `actionIds` (optional): Space-separated list of action IDs to execute. If provided, only actions with matching IDs will run. All specified IDs must exist in the configuration. Nested actions are addressed by dotted path — see [Selecting nested actions](#selecting-nested-actions).
 
 **Examples:**
 
@@ -260,13 +377,46 @@ concatenate
 - Execution order is preserved from the configuration file, not from the command-line order
 - All requested action IDs must exist in the configuration or an error will be raised
 - If a configuration has mixed actions (some with IDs, some without), only actions with matching IDs will run
-- Duplicate action IDs within a configuration will cause an error
+- Duplicate action IDs **within one sibling set** will cause an error
 - Actions without IDs cannot be selected for filtering
+
+#### Selecting nested actions
+
+Nested actions are addressed by their dotted path, joining ids from the root down:
+
+```bash
+# The root-level action called `eslint`
+concatenate check eslint
+
+# The `eslint` nested inside the `tsc` group
+concatenate check tsc.eslint
+
+# The whole `tsc` group, everything inside it
+concatenate check tsc
+```
+
+- **Selecting a group runs its entire subtree.**
+- **A selected descendant keeps its ancestors** as a spine, so `check tsc.eslint` still
+  renders the `tsc` group around the action it runs.
+- **Matching is the exact dotted path.** A bare `eslint` is the root-level action and
+  never a nested one sharing the name. There is no unique-suffix shorthand — it would
+  make the same id mean different things depending on what else exists in the tree.
+- **An action under an id-less ancestor cannot be selected**, even if it has an id of its
+  own. Give the ancestor an id to make its subtree addressable.
+
+An unknown id lists everything that _is_ addressable, in configuration order:
+
+```
+[ERROR] The following action IDs were not found: nope.
+Available IDs: eslint, tsc, tsc.eslint, tsc.prettier
+```
 
 **Exit Codes:**
 
 - `0` - All tasks completed successfully
-- `1` - One or more tasks failed or general error
+- `1` - One or more tasks failed, or a general error
+- `4` - The configuration file does not match the schema
+- `5` - Concatenate was asked to run concatenate; see [Self-invocation](#self-invocation)
 
 ---
 
@@ -307,6 +457,7 @@ concatenate setup json
 
 **Exit Codes:**
 
+- `0` - Configuration files created
 - `4` - Invalid file extension provided to setup command
 
 ---
@@ -324,8 +475,9 @@ type: series
 actions:
   - label: Install Dependencies
     command: npm ci
-  - label: Run Linters
-    command: eslint .
+  - id: quality
+    label: Run Linters
+    import: ./check.yaml
   - label: Run Tests
     command: npm test
   - label: Build Project
@@ -336,11 +488,10 @@ actions:
 concatenate ci
 ```
 
-> **Do not call concatenate from a config.** An earlier version of this example used
-> `command: concatenate check` to reuse another config. That re-read the same file from
-> the same directory and recursed until the machine ran out of memory, printing nothing
-> at all along the way, so it is now refused outright — see
-> [Self-invocation](#self-invocation) below.
+`import:` is how a workflow reuses another config. An earlier version of this example
+used `command: concatenate check`, which re-read the same directory and recursed until
+the machine ran out of memory, printing nothing along the way. That is now refused
+outright — see [Self-invocation](#self-invocation).
 
 ### Example 2: Pre-commit Checks
 
@@ -525,8 +676,9 @@ This is refused outright, with exit code 5, by two independent checks:
   command: concatenate check
 ```
 
-**Solution**: Inline the commands you wanted to reuse, or call the underlying tools
-directly.
+**Solution**: Use `import:` — that is what it is for. Replace
+`command: concatenate check` with `import: ./check.yaml`, and the other config runs as a
+subtree in the same process. See [Nested configurations](#nested-configurations).
 
 **Escape hatch**: `CONCATENATE_ALLOW_NESTED=1` disables the environment check. It exists
 for one case — a monorepo where an action runs a sub-package build that legitimately has
